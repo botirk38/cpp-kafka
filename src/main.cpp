@@ -73,11 +73,18 @@ int main(int argc, char *argv[]) {
     int32_t message_size = 4;
     message_size = htonl(message_size);
 
-    char response[8];
+    int16_t api_version;
+    memcpy(&api_version, buffer + 6, sizeof(api_version));
+
+    int16_t error_code =
+        htons(api_version > 4 ? 35 : 0); // UNSUPPORTED_VERSION = 35
+
+    char response[10];
     memcpy(response, &message_size, 4);
     memcpy(response + 4, &correlation_id, 4);
+    memcpy(response + 8, &error_code, 2);
 
-    send(client_fd, response, 8, 0);
+    send(client_fd, response, 10, 0);
     close(client_fd);
   }
 
