@@ -58,29 +58,29 @@ int main(int argc, char *argv[]) {
     int client_fd =
         accept(server_fd, reinterpret_cast<struct sockaddr *>(&client_addr),
                &client_addr_len);
-
     if (client_fd < 0) {
       std::cerr << "Accept failed" << std::endl;
       continue;
     }
     std::cout << "Client connected\n";
 
-    int32_t message_size = 4;
-    int32_t correlation_id = 7;
-
     char buffer[1024];
     recv(client_fd, buffer, sizeof(buffer), 0);
 
+    int32_t correlation_id;
+    memcpy(&correlation_id, buffer + 8, sizeof(correlation_id));
+
+    int32_t message_size = 4;
     message_size = htonl(message_size);
-    correlation_id = htonl(correlation_id);
 
     char response[8];
     memcpy(response, &message_size, 4);
     memcpy(response + 4, &correlation_id, 4);
-    send(client_fd, response, 8, 0);
 
+    send(client_fd, response, 8, 0);
     close(client_fd);
   }
+
   close(server_fd);
   return 0;
 }
