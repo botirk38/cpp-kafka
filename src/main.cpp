@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
     memcpy(&api_version, buffer + 6, sizeof(api_version));
 
     int16_t error_code =
-        htons(api_version > 4 ? 35 : 0); // UNSUPPORTED_VERSION = 35
+        htons(ntohs(api_version) > 4 ? 35 : 0); // UNSUPPORTED_VERSION = 35
 
     char response[10];
     memcpy(response, &message_size, 4);
