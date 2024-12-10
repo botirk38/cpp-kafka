@@ -5,7 +5,8 @@
 #include <system_error>
 #include <unistd.h>
 
-KafkaServer::KafkaServer(uint16_t port) : port(port) {
+KafkaServer::KafkaServer(uint16_t port)
+    : port(port), thread_pool(std::thread::hardware_concurrency()) {
   server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     throw std::system_error(errno, std::generic_category(),
@@ -56,7 +57,7 @@ void KafkaServer::start() {
       continue;
     }
 
-    handleClient(client_fd);
+    thread_pool.enqueue([this, client_fd] { handleClient(client_fd); });
   }
 }
 
@@ -80,7 +81,10 @@ void KafkaServer::handleClient(int client_fd) {
 
     ApiVersionResponse::write(response, offset, correlation_id, api_version);
 
-    send(client_fd, response, offset, 0);
+    ssize_t bytes_wrote = send(client_fd, response, offset, 0);
+
+    if (bytes_wrote < 0)
+      break;
   }
   close(client_fd);
 }
