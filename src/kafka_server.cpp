@@ -61,21 +61,26 @@ void KafkaServer::start() {
 }
 
 void KafkaServer::handleClient(int client_fd) {
-  char buffer[BUFFER_SIZE];
-  char response[BUFFER_SIZE];
-  int offset = 0;
+  while (true) {
+    char buffer[BUFFER_SIZE];
+    char response[BUFFER_SIZE];
+    int offset = 0;
 
-  recv(client_fd, buffer, sizeof(buffer), 0);
+    ssize_t bytes_received = recv(client_fd, buffer, sizeof(buffer), 0);
 
-  int32_t correlation_id;
-  memcpy(&correlation_id, buffer + 8, sizeof(correlation_id));
+    if (bytes_received <= 0)
+      break;
 
-  int16_t api_version;
-  memcpy(&api_version, buffer + 6, sizeof(api_version));
-  api_version = ntohs(api_version);
+    int32_t correlation_id;
+    memcpy(&correlation_id, buffer + 8, sizeof(correlation_id));
 
-  ApiVersionResponse::write(response, offset, correlation_id, api_version);
+    int16_t api_version;
+    memcpy(&api_version, buffer + 6, sizeof(api_version));
+    api_version = ntohs(api_version);
 
-  send(client_fd, response, offset, 0);
+    ApiVersionResponse::write(response, offset, correlation_id, api_version);
+
+    send(client_fd, response, offset, 0);
+  }
   close(client_fd);
 }
