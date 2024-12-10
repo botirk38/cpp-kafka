@@ -54,11 +54,6 @@ int main(int argc, char *argv[]) {
 
   std::cerr << "Logs from your program will appear here!\n";
 
-  int client_fd =
-      accept(server_fd, reinterpret_cast<struct sockaddr *>(&client_addr),
-             &client_addr_len);
-  std::cout << "Client connected\n";
-
   while (true) {
     int client_fd =
         accept(server_fd, reinterpret_cast<struct sockaddr *>(&client_addr),
@@ -68,16 +63,21 @@ int main(int argc, char *argv[]) {
       std::cerr << "Accept failed" << std::endl;
       continue;
     }
+    std::cout << "Client connected\n";
 
-    int32_t message_size = 0;
+    int32_t message_size = 4;
     int32_t correlation_id = 7;
+
+    char buffer[1024];
+    recv(client_fd, buffer, sizeof(buffer), 0);
 
     message_size = htonl(message_size);
     correlation_id = htonl(correlation_id);
 
-    send(client_fd, &message_size, sizeof(message_size), 0);
-
-    send(client_fd, &correlation_id, sizeof(correlation_id), 0);
+    char response[8];
+    memcpy(response, &message_size, 4);
+    memcpy(response + 4, &correlation_id, 4);
+    send(client_fd, response, 8, 0);
 
     close(client_fd);
   }
