@@ -1,11 +1,11 @@
 #include "include/kafka_parser.hpp"
 #include "include/api_version_response.hpp"
-#include "include/describe_topics_response.hpp"
+#include "include/describe_topics_partitions_response.hpp"
 #include <arpa/inet.h>
 #include <cstring>
 
 using ApiVersion = ApiVersionResponse::ApiVersions;
-using DescribeTopics = DescribeTopicsResponse::DescribeTopics;
+using DescribeTopics = DescribeTopicPartitionsResponse::DescribeTopicPartitions;
 
 Parser::Buffer::Buffer(const uint8_t *data, size_t length)
     : data(data), length(length) {}

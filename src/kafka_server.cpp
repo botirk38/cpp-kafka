@@ -1,8 +1,11 @@
 #include "include/kafka_server.hpp"
 #include "include/api_version_response.hpp"
-#include "include/describe_topics_response.hpp"
+#include "include/describe_topics_partitions_response.hpp"
+#include "include/log_metadata_reader.hpp"
 #include <cstring>
 #include <iostream>
+#include <optional>
+#include <ostream>
 #include <system_error>
 #include <unistd.h>
 
@@ -37,9 +40,9 @@ void KafkaServer::registerHandlers() {
         handleApiVersions(request, response, offset);
       };
 
-  apiHandlers[DescribeTopicsResponse::DescribeTopics::KEY] =
+  apiHandlers[DescribeTopicPartitionsResponse::DescribeTopicPartitions::KEY] =
       [this](const KafkaRequest &request, char *response, int &offset) {
-        handleDescribeTopics(request, response, offset);
+        handleDescribeTopicPartitions(request, response, offset);
       };
 }
 
@@ -122,20 +125,27 @@ void KafkaServer::handleApiVersions(const KafkaRequest &request, char *response,
   offset = writer.getOffset();
 }
 
-void KafkaServer::handleDescribeTopics(const KafkaRequest &request,
-                                       char *response, int &offset) {
+void KafkaServer::handleDescribeTopicPartitions(const KafkaRequest &request,
+                                                char *response, int &offset) {
   const auto &header = request.header;
   const auto &describe_request =
       dynamic_cast<const DescribeTopicsRequest &>(request);
 
-  DescribeTopicsResponse writer(response);
-  writer.writeHeader(header.correlation_id);
+  std::cout << "Topic Name: " << describe_request.topic_names[0] << std::endl;
 
-  for (const auto &topic : describe_request.topic_names) {
-    writer.writeTopic(topic);
-  }
+  KafkaLogMetadataReader reader(
+      "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log");
+  auto metadata = reader.findTopic(describe_request.topic_names[0]);
 
-  writer.complete();
+  std::string is_meta_data_null = !metadata ? "True" : "False";
+  std::cout << "Metadata is null: " << is_meta_data_null << std::endl;
+
+  DescribeTopicPartitionsResponse writer(response);
+  writer.writeHeader(header.correlation_id)
+      .writeTopic(describe_request.topic_names[0],
+                  metadata ? std::make_optional(metadata->topic_id)
+                           : std::nullopt)
+      .complete();
+
   offset = writer.getOffset();
 }
-

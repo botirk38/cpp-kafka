@@ -1,6 +1,7 @@
 #pragma once
 #include <arpa/inet.h>
 #include <cstring>
+#include <string>
 
 template <typename Derived> class MessageWriter {
 protected:
@@ -38,6 +39,27 @@ public:
 
   Derived &skipBytes(int count) {
     offset += count;
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &writeBytes(const void *bytes, size_t length) {
+
+    if (bytes) {
+      memcpy(buffer + offset, bytes, length);
+    } else {
+      memset(buffer + offset, 0, length);
+    }
+
+    offset += length;
+
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &writeCompactString(const std::string &str) {
+    int16_t length = static_cast<int16_t>(str.length());
+    memcpy(buffer + offset, str.c_str(), length);
+    offset += length;
+
     return *static_cast<Derived *>(this);
   }
 

@@ -1,7 +1,8 @@
 #include "include/api_version_response.hpp"
-#include "include/describe_topics_response.hpp"
+#include "include/describe_topics_partitions_response.hpp"
 
-using DescribeTopics = DescribeTopicsResponse::DescribeTopics;
+using DescribeTopicPartitions =
+    DescribeTopicPartitionsResponse::DescribeTopicPartitions;
 
 ApiVersionResponse &ApiVersionResponse::writeHeader(int32_t correlation_id,
                                                     int16_t api_version) {
@@ -24,7 +25,7 @@ ApiVersionResponse &ApiVersionResponse::writeApiVersionSupport() {
 }
 
 ApiVersionResponse &ApiVersionResponse::writeDescribeTopicsSupport() {
-  writeInt16(DescribeTopics::KEY)
+  writeInt16(DescribeTopicPartitions::KEY)
       .writeInt16(0)  // version
       .writeInt16(0)  // version
       .writeUInt8(0); // tag_buffer

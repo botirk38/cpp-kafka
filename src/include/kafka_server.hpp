@@ -25,8 +25,8 @@ private:
 
   void handleApiVersions(const KafkaRequest &request, char *response,
                          int &offset);
-  void handleDescribeTopics(const KafkaRequest &request, char *response,
-                            int &offset);
+  void handleDescribeTopicPartitions(const KafkaRequest &request,
+                                     char *response, int &offset);
 
   uint16_t port = 9092;
   int server_fd{-1};
@@ -34,4 +34,3 @@ private:
   ThreadPool thread_pool;
   std::map<int16_t, RequestHandler> apiHandlers;
 };
-
