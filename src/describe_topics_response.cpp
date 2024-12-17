@@ -32,11 +32,10 @@ DescribeTopicPartitionsResponse::writeTopicMetadata(
       .writeCompactString(topic_name)
       .writeBytes(topic_id.data(), topic_id.size())
       .writeInt8(0)  // is_internal
-      .writeInt8(3); // partitions array length (length + 1)
+      .writeInt8(2); // partitions array length (length + 1)
 
   // Write two partitions
   writePartitionMetadata(0);
-  writePartitionMetadata(1);
 
   writeInt32(0xdf8)  // topic_authorized_operations
       .writeInt8(0); // Tag buffer

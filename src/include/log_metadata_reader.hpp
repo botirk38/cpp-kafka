@@ -18,7 +18,8 @@ public:
 
   explicit KafkaLogMetadataReader(const std::string &log_path);
 
-  std::optional<TopicMetadata> findTopic(const std::string &topic_name);
+  std::optional<TopicMetadata> findTopic(const std::string &topic_name,
+                                         std::optional<int> partition_id = -1);
 
 private:
   std::string log_path;

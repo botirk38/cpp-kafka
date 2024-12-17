@@ -5,7 +5,7 @@ public:
   struct Record {
     int32_t length;
     int8_t attributes;
-    int64_t timestamp_delta;
+    int32_t timestamp_delta;
     int32_t offset_delta;
     std::vector<uint8_t> key;
     std::vector<uint8_t> value;
@@ -14,34 +14,44 @@ public:
 
   explicit RecordReader(std::ifstream &file) : ByteReader(file) {}
 
-  RecordReader &readLength() { return readNetworkOrder(record.length); }
+  RecordReader &readLength() { return readVarint(record.length); }
 
   RecordReader &readAttributes() { return readRaw(record.attributes); }
 
   RecordReader &readTimestampDelta() {
-    return readNetworkOrder(record.timestamp_delta);
+    return readVarint(record.timestamp_delta);
   }
 
-  RecordReader &readOffsetDelta() {
-    return readNetworkOrder(record.offset_delta);
-  }
+  RecordReader &readOffsetDelta() { return readVarint(record.offset_delta); }
 
   RecordReader &readKeyValue() {
     int32_t key_length;
-    readNetworkOrder(key_length);
-    if (key_length > 0) {
-      readBytes(record.key, key_length);
+    readZigZagVarint(key_length);
+    if (key_length >= 0) {
+      record.key.clear();
+      record.key.reserve(key_length);
+      for (int i = 0; i < key_length; i++) {
+        uint8_t byte;
+        readRaw(byte);
+        record.key.push_back(byte);
+      }
     }
 
     int32_t value_length;
-    readNetworkOrder(value_length);
-    if (value_length > 0) {
-      readBytes(record.value, value_length);
+    readZigZagVarint(value_length);
+    if (value_length >= 0) {
+      record.value.clear();
+      record.value.reserve(value_length);
+      for (int i = 0; i < value_length; i++) {
+        uint8_t byte;
+        readRaw(byte);
+        record.value.push_back(byte);
+      }
     }
     return *this;
   }
 
-  RecordReader &readHeaders() { return readNetworkOrder(record.headers_count); }
+  RecordReader &readHeaders() { return readVarint(record.headers_count); }
 
   Record complete() { return std::move(record); }
 
@@ -58,7 +68,7 @@ public:
     int32_t batch_length;
     int32_t partition_leader_epoch;
     int8_t magic_byte;
-    uint32_t crc;
+    int32_t crc;
     int16_t attributes;
     int32_t last_offset_delta;
     int64_t base_timestamp;
