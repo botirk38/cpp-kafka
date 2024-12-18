@@ -3,9 +3,12 @@
 #include "include/describe_topics_partitions_response.hpp"
 #include "include/log_metadata_reader.hpp"
 #include <cstring>
+#include <errno.h>
+#include <fcntl.h>
 #include <iostream>
 #include <optional>
 #include <ostream>
+#include <sys/socket.h>
 #include <system_error>
 #include <unistd.h>
 
@@ -85,22 +88,42 @@ void KafkaServer::handleClient(int client_fd) {
   std::vector<uint8_t> buffer(BUFFER_SIZE);
   char response[BUFFER_SIZE];
 
+  // Set socket to non-blocking mode
+  int flags = fcntl(client_fd, F_GETFL, 0);
+  fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+
   while (true) {
-    ssize_t bytes_received = recv(client_fd, buffer.data(), buffer.size(), 0);
-    if (bytes_received <= 0)
+    ssize_t bytes_received =
+        recv(client_fd, buffer.data(), buffer.size(), MSG_DONTWAIT);
+    if (bytes_received < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        // No data available, continue polling
+        continue;
+      }
       break;
+    }
+    if (bytes_received == 0) {
+      break;
+    }
 
     try {
       int offset = 0;
       auto request = Parser::parse(buffer.data(), bytes_received);
-
       auto handler = apiHandlers.find(request->header.api_key);
+
       if (handler != apiHandlers.end()) {
         handler->second(*request, response, offset);
 
+        // Send response with timeout
+        struct timeval tv;
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
+        setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
         ssize_t bytes_wrote = send(client_fd, response, offset, 0);
-        if (bytes_wrote < 0)
+        if (bytes_wrote < 0) {
           break;
+        }
       }
     } catch (const ParseError &e) {
       std::cerr << "Parse error: " << e.what() << std::endl;
