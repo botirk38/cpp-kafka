@@ -1,4 +1,6 @@
 #pragma once
+
+#include "kafka_metadata.hpp"
 #include "message_writer.hpp"
 #include <array>
 #include <optional>
@@ -10,9 +12,10 @@ public:
   DescribeTopicPartitionsResponse(char *buf) : MessageWriter(buf) {}
 
   DescribeTopicPartitionsResponse &writeHeader(int32_t correlation_id);
-  DescribeTopicPartitionsResponse &writeTopic(
-      const std::string &topic_name,
-      const std::optional<std::array<uint8_t, 16>> &topic_id = std::nullopt);
+
+  DescribeTopicPartitionsResponse &
+  writeTopic(const std::string &topic_name,
+             const std::optional<KafkaMetadata::TopicMetadata> &topic_metadata);
   DescribeTopicPartitionsResponse &complete();
 
   enum DescribeTopicPartitions {
@@ -22,9 +25,10 @@ public:
   };
 
 private:
-  DescribeTopicPartitionsResponse &
-  writeTopicMetadata(const std::string &topic_name,
-                     const std::array<uint8_t, 16> &topic_id);
+  DescribeTopicPartitionsResponse &writeTopicMetadata(
+      const std::string &topic_name, const std::array<uint8_t, 16> &topic_id,
+      const std::vector<KafkaMetadata::PartitionMetadata> &partition_metadata);
+
   DescribeTopicPartitionsResponse &writePartitionMetadata(int32_t partition_id);
   DescribeTopicPartitionsResponse &
   writeUnknownTopicError(const std::string &topic_name);

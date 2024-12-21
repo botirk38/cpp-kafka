@@ -1,5 +1,6 @@
 #include "include/log_metadata_reader.hpp"
 #include <iostream>
+#include <optional>
 
 KafkaLogMetadataReader::KafkaLogMetadataReader(const std::string &log_path)
     : log_path(log_path) {}
@@ -49,36 +50,37 @@ KafkaLogMetadataReader::findTopic(const std::string &topic_name,
     return std::nullopt;
   }
 
+  TopicMetadata result;
+
   auto batches = readAllBatches(file);
-  std::cout << "Read " << batches.size() << " record batches" << std::endl;
+  bool found_topic = false;
 
   for (const auto &batch : batches) {
-    std::cout << "Processing batch with base offset: " << batch.base_offset
-              << std::endl;
-    std::cout << "Batch contains " << batch.records.size() << " records"
-              << std::endl;
-
     for (const auto &record : batch.records) {
-      std::cout << "Processing record with length: " << record.length
-                << ", key size: " << record.key.size()
-                << ", value size: " << record.value.size() << std::endl;
-
-      auto metadata = parseTopicMetadata(record);
-      std::cout << "Parsed metadata - name: " << metadata.name
-                << ", partition: " << metadata.partition_id << std::endl;
-
-      if (metadata.name == topic_name) {
-        std::cout << "Found matching topic: " << topic_name << std::endl;
-
-        if (partition_id >= 0 && metadata.partition_id != partition_id) {
-          continue;
+      // Check for topic record (type 0x02)
+      if (record.value[1] == 0x02) {
+        auto topic = parseTopicMetadata(record);
+        if (topic.name == topic_name) {
+          result = topic;
+          found_topic = true;
         }
-        return metadata;
+      }
+      // Check for partition record (type 0x03)
+      else if (found_topic && record.value[1] == 0x03) {
+        auto partition = parsePartitionMetadata(record);
+        if (partition.topic_id == result.topic_id) {
+          result.partitions.push_back(partition);
+        }
       }
     }
   }
 
-  std::cout << "Topic not found: " << topic_name << std::endl;
+  std::cout << "Found " << result.partitions.size()
+            << " partitions for topic: " << topic_name << std::endl;
+  if (found_topic) {
+    return result;
+  }
+
   return std::nullopt;
 }
 
@@ -86,42 +88,75 @@ KafkaLogMetadataReader::TopicMetadata
 KafkaLogMetadataReader::parseTopicMetadata(const RecordReader::Record &record) {
   TopicMetadata metadata;
   const uint8_t *data = record.value.data();
-  size_t size = record.value.size();
 
-  // Need at least frame version (1) + type (1) + version (1) bytes
-  if (size < 3)
-    return metadata;
-
-  // Skip frame version, type, and record version
+  // Skip frame version, type, version (3 bytes)
   size_t pos = 3;
 
   // Read name length (compact string format)
-  if (size < pos + 1)
-    return metadata;
-  uint8_t name_length =
-      data[pos] - 1; // Compact string length is encoded as actual length + 1
+  uint8_t name_length = data[pos] - 1;
   pos++;
 
-  // Read name
-  if (size < pos + name_length)
-    return metadata;
+  // Read topic name
   metadata.name =
       std::string(reinterpret_cast<const char *>(data + pos), name_length);
   pos += name_length;
 
-  // Read topic UUID
-  if (size < pos + 16)
-    return metadata;
+  // Read topic UUID (16 bytes)
+  std::copy(data + pos, data + pos + 16, metadata.topic_id.begin());
+
+  return metadata;
+};
+
+KafkaLogMetadataReader::PartitionMetadata
+KafkaLogMetadataReader::parsePartitionMetadata(
+    const RecordReader::Record &record) {
+  PartitionMetadata metadata;
+  const uint8_t *data = record.value.data();
+
+  // Skip frame version, type, version
+  size_t pos = 3;
+
+  // Read partition ID (4 bytes)
+  metadata.partition_id = (data[pos] << 24) | (data[pos + 1] << 16) |
+                          (data[pos + 2] << 8) | data[pos + 3];
+  pos += 4;
+
+  // Read topic UUID (16 bytes)
   std::copy(data + pos, data + pos + 16, metadata.topic_id.begin());
   pos += 16;
 
-  // For partition records, read partition ID
-  if (data[1] == 0x03) { // Type 3 is partition record
-    if (size < pos + 4)
-      return metadata;
-    metadata.partition_id = (data[pos] << 24) | (data[pos + 1] << 16) |
-                            (data[pos + 2] << 8) | data[pos + 3];
+  // Parse replicas array
+  uint8_t replica_count = data[pos++] - 1; // Compact array length
+  for (int i = 0; i < replica_count; i++) {
+    int replica_id = (data[pos] << 24) | (data[pos + 1] << 16) |
+                     (data[pos + 2] << 8) | data[pos + 3];
+    metadata.replicas.push_back(replica_id);
+    pos += 4;
   }
+
+  // Parse ISR array similarly
+  uint8_t isr_count = data[pos++] - 1;
+  for (int i = 0; i < isr_count; i++) {
+    int isr_id = (data[pos] << 24) | (data[pos + 1] << 16) |
+                 (data[pos + 2] << 8) | data[pos + 3];
+    metadata.isr.push_back(isr_id);
+    pos += 4;
+  }
+
+  // Skip removing and adding replicas arrays
+  pos += 2; // Skip compact array lengths
+
+  // Read leader ID, leader epoch, partition epoch
+  metadata.leader_id = (data[pos] << 24) | (data[pos + 1] << 16) |
+                       (data[pos + 2] << 8) | data[pos + 3];
+  pos += 4;
+
+  metadata.leader_epoch = (data[pos] << 24) | (data[pos + 1] << 16) |
+                          (data[pos + 2] << 8) | data[pos + 3];
+  pos += 4;
+
+  metadata.partition_epoch = (data[pos] << 24) | (data[pos + 1] << 16) |
+                             (data[pos + 2] << 8) | data[pos + 3];
 
   return metadata;
 }

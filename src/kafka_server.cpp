@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iostream>
-#include <optional>
 #include <ostream>
 #include <sys/socket.h>
 #include <system_error>
@@ -165,9 +164,7 @@ void KafkaServer::handleDescribeTopicPartitions(const KafkaRequest &request,
 
   DescribeTopicPartitionsResponse writer(response);
   writer.writeHeader(header.correlation_id)
-      .writeTopic(describe_request.topic_names[0],
-                  metadata ? std::make_optional(metadata->topic_id)
-                           : std::nullopt)
+      .writeTopic(describe_request.topic_names[0], metadata)
       .complete();
 
   offset = writer.getOffset();

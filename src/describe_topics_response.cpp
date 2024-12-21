@@ -1,5 +1,6 @@
 #include "include/describe_topics_partitions_response.hpp"
 #include <netinet/in.h>
+#include <optional>
 
 DescribeTopicPartitionsResponse &
 DescribeTopicPartitionsResponse::writeHeader(int32_t correlation_id) {
@@ -12,11 +13,12 @@ DescribeTopicPartitionsResponse::writeHeader(int32_t correlation_id) {
 
 DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
     const std::string &topic_name,
-    const std::optional<std::array<uint8_t, 16>> &topic_id) {
+    const std::optional<KafkaMetadata::TopicMetadata> &topic_metadata) {
   writeInt8(2); // topics array length
 
-  if (topic_id) {
-    writeTopicMetadata(topic_name, *topic_id);
+  if (topic_metadata) {
+    writeTopicMetadata(topic_name, topic_metadata->topic_id,
+                       topic_metadata->partitions);
   } else {
     writeUnknownTopicError(topic_name);
   }
@@ -26,16 +28,19 @@ DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
 
 DescribeTopicPartitionsResponse &
 DescribeTopicPartitionsResponse::writeTopicMetadata(
-    const std::string &topic_name, const std::array<uint8_t, 16> &topic_id) {
+    const std::string &topic_name, const std::array<uint8_t, 16> &topic_id,
+    const std::vector<KafkaMetadata::PartitionMetadata> &partition_metadata) {
+  const int8_t num_partitions = partition_metadata.size();
   writeInt16(0)                           // error_code
       .writeInt8(topic_name.length() + 1) // Compact string length
       .writeCompactString(topic_name)
       .writeBytes(topic_id.data(), topic_id.size())
-      .writeInt8(0)  // is_internal
-      .writeInt8(2); // partitions array length (length + 1)
+      .writeInt8(0)                   // is_internal
+      .writeInt8(num_partitions + 1); // partitions array length (length + 1)
 
-  // Write two partitions
-  writePartitionMetadata(0);
+  for (auto &partition : partition_metadata) {
+    writePartitionMetadata(partition.partition_id);
+  }
 
   writeInt32(0xdf8)  // topic_authorized_operations
       .writeInt8(0); // Tag buffer

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "byte_reader.hpp"
 
 class RecordReader : public ByteReader<RecordReader> {
