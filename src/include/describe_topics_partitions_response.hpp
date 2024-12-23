@@ -11,7 +11,8 @@ class DescribeTopicPartitionsResponse
 public:
   DescribeTopicPartitionsResponse(char *buf) : MessageWriter(buf) {}
 
-  DescribeTopicPartitionsResponse &writeHeader(int32_t correlation_id);
+  DescribeTopicPartitionsResponse &writeHeader(int32_t correlation_id,
+                                               int8_t topics_length);
 
   DescribeTopicPartitionsResponse &
   writeTopic(const std::string &topic_name,

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -24,13 +25,17 @@ public:
   RequestHeader header;
 };
 
-class ApiVersionRequest : public KafkaRequest {
-public:
-};
+class ApiVersionRequest : public KafkaRequest {};
 
 class DescribeTopicsRequest : public KafkaRequest {
 public:
   std::vector<std::string> topic_names;
+  int32_t response_partition_limit;
+  struct Cursor {
+    std::string topic_name;
+    int32_t partition_index;
+  };
+  std::optional<Cursor> cursor;
 };
 
 class Parser {
@@ -43,7 +48,24 @@ private:
   public:
     explicit Buffer(const uint8_t *data, size_t length);
 
-    template <typename T> T read() {
+    // Network byte order read operations
+    int16_t readInt16();
+    int32_t readInt32();
+    int8_t readInt8();
+    uint8_t readUInt8();
+
+    // String operations
+    std::string readString();        // Regular string
+    std::string readCompactString(); // Kafka compact string
+
+    // Buffer operations
+    void skip(size_t n);
+    const uint8_t *current() const;
+    size_t remaining() const;
+    void advance(size_t n);
+
+  private:
+    template <typename T> T readRaw() {
       if (remaining() < sizeof(T)) {
         throw ParseError("Buffer underflow");
       }
@@ -53,13 +75,6 @@ private:
       return value;
     }
 
-    std::string readString();
-    void skip(size_t n);
-    const uint8_t *current() const { return data + offset; }
-    size_t remaining() const { return length - offset; }
-    void advance(size_t n);
-
-  private:
     const uint8_t *data;
     size_t length;
     size_t offset{0};

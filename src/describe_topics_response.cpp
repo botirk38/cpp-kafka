@@ -3,18 +3,19 @@
 #include <optional>
 
 DescribeTopicPartitionsResponse &
-DescribeTopicPartitionsResponse::writeHeader(int32_t correlation_id) {
+DescribeTopicPartitionsResponse::writeHeader(int32_t correlation_id,
+                                             int8_t topics_length) {
   skipBytes(4) // Message size placeholder
       .writeInt32(correlation_id)
-      .writeInt8(0)   // Tag buffer
-      .writeInt32(0); // throttle_time_ms
+      .writeInt8(0)                  // Tag buffer
+      .writeInt32(0)                 // throttle_time_ms
+      .writeInt8(topics_length + 1); // topics array length
   return *this;
 }
 
 DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
     const std::string &topic_name,
     const std::optional<KafkaMetadata::TopicMetadata> &topic_metadata) {
-  writeInt8(2); // topics array length
 
   if (topic_metadata) {
     writeTopicMetadata(topic_name, topic_metadata->topic_id,

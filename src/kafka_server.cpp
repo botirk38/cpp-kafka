@@ -153,19 +153,19 @@ void KafkaServer::handleDescribeTopicPartitions(const KafkaRequest &request,
   const auto &describe_request =
       dynamic_cast<const DescribeTopicsRequest &>(request);
 
-  std::cout << "Topic Name: " << describe_request.topic_names[0] << std::endl;
-
   KafkaLogMetadataReader reader(
       "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log");
-  auto metadata = reader.findTopic(describe_request.topic_names[0]);
-
-  std::string is_meta_data_null = !metadata ? "True" : "False";
-  std::cout << "Metadata is null: " << is_meta_data_null << std::endl;
 
   DescribeTopicPartitionsResponse writer(response);
-  writer.writeHeader(header.correlation_id)
-      .writeTopic(describe_request.topic_names[0], metadata)
-      .complete();
+  writer.writeHeader(header.correlation_id,
+                     describe_request.topic_names.size());
 
+  // Process each requested topic
+  for (const auto &topic_name : describe_request.topic_names) {
+    auto metadata = reader.findTopic(topic_name);
+    writer.writeTopic(topic_name, metadata);
+  }
+
+  writer.complete();
   offset = writer.getOffset();
 }
