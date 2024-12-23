@@ -1,4 +1,5 @@
 #include "include/describe_topics_partitions_response.hpp"
+#include "include/fetch_response.hpp"
 #include <netinet/in.h>
 #include <optional>
 
@@ -29,13 +30,13 @@ DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
 
 DescribeTopicPartitionsResponse &
 DescribeTopicPartitionsResponse::writeTopicMetadata(
-    const std::string &topic_name, const std::array<uint8_t, 16> &topic_id,
+    const std::string &topic_name, const uint128_t topic_id,
     const std::vector<KafkaMetadata::PartitionMetadata> &partition_metadata) {
   const int8_t num_partitions = partition_metadata.size();
   writeInt16(0)                           // error_code
       .writeInt8(topic_name.length() + 1) // Compact string length
       .writeCompactString(topic_name)
-      .writeBytes(topic_id.data(), topic_id.size())
+      .writeUint128(topic_id)
       .writeInt8(0)                   // is_internal
       .writeInt8(num_partitions + 1); // partitions array length (length + 1)
 

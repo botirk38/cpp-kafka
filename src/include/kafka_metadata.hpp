@@ -5,10 +5,12 @@
 #include "vector"
 #include <string>
 
+using uint128_t = __uint128_t;
+
 namespace KafkaMetadata {
 struct PartitionMetadata {
   int partition_id;
-  std::array<uint8_t, 16> topic_id;
+  uint128_t topic_id;
   int leader_id;
   int leader_epoch;
   int partition_epoch;
@@ -17,7 +19,7 @@ struct PartitionMetadata {
 };
 struct TopicMetadata {
 
-  std::array<uint8_t, 16> topic_id;
+  uint128_t topic_id;
   std::string name;
   std::vector<PartitionMetadata> partitions;
 };

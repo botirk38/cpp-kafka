@@ -2,7 +2,6 @@
 
 #include "kafka_metadata.hpp"
 #include "message_writer.hpp"
-#include <array>
 #include <optional>
 #include <string>
 
@@ -27,7 +26,7 @@ public:
 
 private:
   DescribeTopicPartitionsResponse &writeTopicMetadata(
-      const std::string &topic_name, const std::array<uint8_t, 16> &topic_id,
+      const std::string &topic_name, const uint128_t topic_id,
       const std::vector<KafkaMetadata::PartitionMetadata> &partition_metadata);
 
   DescribeTopicPartitionsResponse &writePartitionMetadata(int32_t partition_id);

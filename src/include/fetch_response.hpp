@@ -21,8 +21,8 @@ public:
 
   FetchResponse &
   writeTopicResponse(uint128_t topic_id, int32_t partition_index,
-                     int16_t error_code, int64_t high_watermark,
-                     int64_t last_stable_offset, int64_t log_start_offset,
+                     int64_t high_watermark, int64_t last_stable_offset,
+                     int64_t log_start_offset,
                      const std::vector<AbortedTransaction> &aborted_txns,
                      int32_t preferred_read_replica, const char *records_data,
                      size_t records_len, bool topic_exists);

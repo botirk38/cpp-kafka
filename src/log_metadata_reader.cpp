@@ -101,8 +101,12 @@ KafkaLogMetadataReader::parseTopicMetadata(const RecordReader::Record &record) {
       std::string(reinterpret_cast<const char *>(data + pos), name_length);
   pos += name_length;
 
-  // Read topic UUID (16 bytes)
-  std::copy(data + pos, data + pos + 16, metadata.topic_id.begin());
+  metadata.topic_id = 0;
+  for (int i = 0; i < 16; i++) {
+    metadata.topic_id = (metadata.topic_id << 8) | data[pos + i];
+  }
+
+  pos += 16;
 
   return metadata;
 };
@@ -121,8 +125,10 @@ KafkaLogMetadataReader::parsePartitionMetadata(
                           (data[pos + 2] << 8) | data[pos + 3];
   pos += 4;
 
-  // Read topic UUID (16 bytes)
-  std::copy(data + pos, data + pos + 16, metadata.topic_id.begin());
+  metadata.topic_id = 0;
+  for (int i = 0; i < 16; i++) {
+    metadata.topic_id = (metadata.topic_id << 8) | data[pos + i];
+  }
   pos += 16;
 
   // Parse replicas array
@@ -159,4 +165,48 @@ KafkaLogMetadataReader::parsePartitionMetadata(
                              (data[pos + 2] << 8) | data[pos + 3];
 
   return metadata;
+}
+
+std::optional<KafkaLogMetadataReader::TopicMetadata>
+KafkaLogMetadataReader::findTopicById(const uint128_t &topic_id) {
+  std::cout << "Searching for topic with ID" << std::endl;
+
+  std::ifstream file(log_path, std::ios::binary);
+  if (!file.is_open()) {
+    std::cout << "Failed to open log file: " << log_path << std::endl;
+    return std::nullopt;
+  }
+
+  TopicMetadata result;
+  auto batches = readAllBatches(file);
+  bool found_topic = false;
+
+  for (const auto &batch : batches) {
+    for (const auto &record : batch.records) {
+      // Check for topic record (type 0x02)
+      if (record.value[1] == 0x02) {
+        auto topic = parseTopicMetadata(record);
+        if (topic.topic_id == topic_id) {
+          result = topic;
+          found_topic = true;
+        }
+      }
+      // Check for partition record (type 0x03)
+      else if (found_topic && record.value[1] == 0x03) {
+        auto partition = parsePartitionMetadata(record);
+        if (partition.topic_id == result.topic_id) {
+          result.partitions.push_back(partition);
+        }
+      }
+    }
+  }
+
+  std::cout << "Found " << result.partitions.size()
+            << " partitions for topic ID" << std::endl;
+
+  if (found_topic) {
+    return result;
+  }
+
+  return std::nullopt;
 }

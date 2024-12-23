@@ -2,7 +2,6 @@
 #include "include/api_version_response.hpp"
 #include "include/describe_topics_partitions_response.hpp"
 #include "include/fetch_response.hpp"
-#include "include/kafka_errors.hpp"
 #include "include/kafka_parser.hpp"
 #include "include/kafka_request.hpp"
 #include "include/log_metadata_reader.hpp"
@@ -10,6 +9,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iostream>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <sys/socket.h>
@@ -190,12 +190,16 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
 
   FetchResponse writer(response);
   writer.writeHeader(header.correlation_id, 0, 0, topics_size);
+  KafkaLogMetadataReader reader(
+      "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log");
 
   // For now, treat all topics as unknown
   for (const auto &topic : fetch_request.topics) {
+    auto metadata = reader.findTopicById(topic.topic_id);
+
     for (const auto &partition : topic.partitions) {
       writer.writeTopicResponse(
-          topic.topic_id, partition.partition, ERROR_UNKNOWN_TOPIC_OR_PARTITION,
+          topic.topic_id, partition.partition,
           0,  // high_watermark
           -1, // last_stable_offset
           -1, // log_start_offset
@@ -204,7 +208,7 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
           -1,      // preferred_read_replica
           nullptr, // records data
           0,       // records length
-          false);
+          metadata != std::nullopt ? true : false);
     }
   }
 
