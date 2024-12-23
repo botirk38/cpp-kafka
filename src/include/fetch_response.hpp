@@ -2,6 +2,8 @@
 #include "message_writer.hpp"
 #include <vector>
 
+using uint128_t = __uint128_t;
+
 class FetchResponse : public MessageWriter<FetchResponse> {
 
 public:
@@ -18,10 +20,9 @@ public:
                              int32_t session_id, int8_t topic_count);
 
   FetchResponse &
-  writeTopicResponse(const std::array<uint8_t, 16> &topic_id,
-                     int32_t partition_index, int16_t error_code,
-                     int64_t high_watermark, int64_t last_stable_offset,
-                     int64_t log_start_offset,
+  writeTopicResponse(uint128_t topic_id, int32_t partition_index,
+                     int16_t error_code, int64_t high_watermark,
+                     int64_t last_stable_offset, int64_t log_start_offset,
                      const std::vector<AbortedTransaction> &aborted_txns,
                      int32_t preferred_read_replica, const char *records_data,
                      size_t records_len, bool topic_exists);
@@ -29,7 +30,4 @@ public:
   FetchResponse &complete();
 
 private:
-  FetchResponse &
-  writeUnknownTopicResponse(const std::array<uint8_t, 16> &topic_id,
-                            int32_t partition_index);
 };

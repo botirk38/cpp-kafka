@@ -35,6 +35,14 @@ uint8_t Parser::Buffer::readUInt8() { return readRaw<uint8_t>(); }
 
 int64_t Parser::Buffer::readInt64() { return readRaw<int64_t>(); }
 
+uint128_t Parser::Buffer::readUint128() {
+  uint128_t result = 0;
+  for (int i = 0; i < 16; i++) {
+    result = (result << 8) | readUInt8();
+  }
+  return result;
+}
+
 void Parser::Buffer::readBytes(uint8_t *dest, size_t length) {
   if (remaining() < length) {
     throw ParseError("Buffer underflow");
@@ -54,7 +62,16 @@ std::string Parser::Buffer::readString() {
 }
 
 std::string Parser::Buffer::readCompactString() {
-  auto len = readUInt8() - 1;
+  auto len = readUInt8();
+  if (len == 0) {
+    return "";
+  }
+  len--;
+
+  if (len > remaining()) {
+    throw ParseError("Invalid compact string length");
+  }
+
   std::string result(reinterpret_cast<const char *>(current()), len);
   advance(len);
   return result;
@@ -134,6 +151,7 @@ std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
                                                  RequestHeader header) {
   auto request = std::make_unique<FetchRequest>();
   request->header = header;
+  buffer.skip(1);
 
   request->max_wait_ms = buffer.readInt32();
   request->min_bytes = buffer.readInt32();
@@ -143,12 +161,14 @@ std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
   request->session_epoch = buffer.readInt32();
 
   // Read topics array
-  int topics_length = buffer.readInt8() - 1; // Compact array
+  int topics_length = buffer.readInt8() - 1;
+
   for (int i = 0; i < topics_length; i++) {
     FetchTopic topic;
-    buffer.readBytes(topic.topic_id.data(), 16); // Read UUID
+    topic.topic_id = buffer.readUint128();
 
-    int partitions_length = buffer.readInt8() - 1; // Compact array
+    int partitions_length = buffer.readInt8() - 1;
+
     for (int j = 0; j < partitions_length; j++) {
       FetchPartition partition;
       partition.partition = buffer.readInt32();
@@ -159,17 +179,19 @@ std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
       partition.partition_max_bytes = buffer.readInt32();
       topic.partitions.push_back(partition);
     }
-    buffer.readInt8(); // Tag buffer
+
     request->topics.push_back(topic);
   }
 
   // Read forgotten topics
-  int forgotten_topics_length = buffer.readInt8() - 1; // Compact array
-  for (int i = 0; i < forgotten_topics_length; i++) {
-    ForgottenTopic topic;
-    buffer.readBytes(topic.topic_id.data(), 16); // Read UUID
+  int8_t forgotten_topics_length = buffer.readInt8() - 1;
 
-    int partitions_length = buffer.readInt8() - 1; // Compact array
+  for (int8_t i = 0; i < forgotten_topics_length; i++) {
+    ForgottenTopic topic;
+    topic.topic_id = buffer.readUint128();
+
+    int partitions_length = buffer.readInt8() - 1;
+
     for (int j = 0; j < partitions_length; j++) {
       topic.partitions.push_back(buffer.readInt32());
     }
@@ -177,7 +199,6 @@ std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
   }
 
   request->rack_id = buffer.readCompactString();
-  buffer.readInt8(); // Tag buffer
 
   return request;
 }

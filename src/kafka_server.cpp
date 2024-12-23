@@ -186,8 +186,10 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
   const auto &header = request.header;
   const auto &fetch_request = dynamic_cast<const FetchRequest &>(request);
 
+  int8_t topics_size = fetch_request.topics.size() + 1;
+
   FetchResponse writer(response);
-  writer.writeHeader(header.correlation_id, 0, 0, fetch_request.topics.size());
+  writer.writeHeader(header.correlation_id, 0, 0, topics_size);
 
   // For now, treat all topics as unknown
   for (const auto &topic : fetch_request.topics) {

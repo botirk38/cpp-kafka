@@ -3,6 +3,7 @@
 #include "api_version_request.hpp"
 #include "describe_topic_partitions_request.hpp"
 #include "fetch_request.hpp"
+#include "fetch_response.hpp"
 #include "kafka_request.hpp"
 #include <cstdint>
 #include <cstring>
@@ -30,6 +31,7 @@ private:
     int8_t readInt8();
     uint8_t readUInt8();
     int64_t readInt64();
+    uint128_t readUint128();
     void readBytes(uint8_t *dest, size_t length);
 
     // String operations

@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <string>
 
+using uint128_t = __uint128_t;
+
 template <typename Derived> class MessageWriter {
 protected:
   char *buffer;
@@ -39,6 +41,17 @@ public:
   Derived &writeUInt8(uint8_t value) {
     memcpy(buffer + offset, &value, sizeof(value));
     offset += sizeof(value);
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &writeUint128(uint128_t value) {
+
+    uint8_t bytes[16];
+    for (int i = 15; i >= 0; i--) {
+      bytes[i] = value & 0xFF;
+      value >>= 8;
+    }
+    writeBytes(bytes, 16);
     return *static_cast<Derived *>(this);
   }
 

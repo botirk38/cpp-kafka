@@ -1,7 +1,7 @@
 #pragma once
 
+#include "fetch_response.hpp"
 #include "kafka_request.hpp"
-#include <array>
 #include <vector>
 
 struct FetchPartition {
@@ -14,12 +14,12 @@ struct FetchPartition {
 };
 
 struct FetchTopic {
-  std::array<uint8_t, 16> topic_id; // UUID
+  uint128_t topic_id; // UUID
   std::vector<FetchPartition> partitions;
 };
 
 struct ForgottenTopic {
-  std::array<uint8_t, 16> topic_id; // UUID
+  uint128_t topic_id; // UUID
   std::vector<int32_t> partitions;
 };
 
