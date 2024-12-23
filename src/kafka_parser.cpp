@@ -1,11 +1,13 @@
 #include "include/kafka_parser.hpp"
 #include "include/api_version_response.hpp"
 #include "include/describe_topics_partitions_response.hpp"
+#include "include/fetch_response.hpp"
 #include <arpa/inet.h>
 #include <iostream>
 
 using ApiVersion = ApiVersionResponse::ApiVersions;
 using DescribeTopics = DescribeTopicPartitionsResponse::DescribeTopicPartitions;
+using Fetch = FetchResponse::Fetch;
 
 Parser::Buffer::Buffer(const uint8_t *data, size_t length)
     : data(data), length(length) {}
@@ -30,6 +32,16 @@ int32_t Parser::Buffer::readInt32() { return ntohl(readRaw<int32_t>()); }
 int8_t Parser::Buffer::readInt8() { return readRaw<int8_t>(); }
 
 uint8_t Parser::Buffer::readUInt8() { return readRaw<uint8_t>(); }
+
+int64_t Parser::Buffer::readInt64() { return readRaw<int64_t>(); }
+
+void Parser::Buffer::readBytes(uint8_t *dest, size_t length) {
+  if (remaining() < length) {
+    throw ParseError("Buffer underflow");
+  }
+  std::memcpy(dest, current(), length);
+  advance(length);
+}
 
 std::string Parser::Buffer::readString() {
   auto len = readInt16();
@@ -61,6 +73,8 @@ std::unique_ptr<KafkaRequest> Parser::parse(const uint8_t *data,
     return parseApiVersion(buffer, std::move(header));
   case DescribeTopics::KEY:
     return parseDescribeTopics(buffer, std::move(header));
+  case Fetch::KEY:
+    return parseFetch(buffer, std::move(header));
   default:
     throw ParseError("Unknown API key: " + std::to_string(header.api_key));
   }
@@ -116,3 +130,54 @@ Parser::parseDescribeTopics(Buffer &buffer, RequestHeader header) {
   return request;
 }
 
+std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
+                                                 RequestHeader header) {
+  auto request = std::make_unique<FetchRequest>();
+  request->header = header;
+
+  request->max_wait_ms = buffer.readInt32();
+  request->min_bytes = buffer.readInt32();
+  request->max_bytes = buffer.readInt32();
+  request->isolation_level = buffer.readInt8();
+  request->session_id = buffer.readInt32();
+  request->session_epoch = buffer.readInt32();
+
+  // Read topics array
+  int topics_length = buffer.readInt8() - 1; // Compact array
+  for (int i = 0; i < topics_length; i++) {
+    FetchTopic topic;
+    buffer.readBytes(topic.topic_id.data(), 16); // Read UUID
+
+    int partitions_length = buffer.readInt8() - 1; // Compact array
+    for (int j = 0; j < partitions_length; j++) {
+      FetchPartition partition;
+      partition.partition = buffer.readInt32();
+      partition.current_leader_epoch = buffer.readInt32();
+      partition.fetch_offset = buffer.readInt64();
+      partition.last_fetched_epoch = buffer.readInt32();
+      partition.log_start_offset = buffer.readInt64();
+      partition.partition_max_bytes = buffer.readInt32();
+      topic.partitions.push_back(partition);
+    }
+    buffer.readInt8(); // Tag buffer
+    request->topics.push_back(topic);
+  }
+
+  // Read forgotten topics
+  int forgotten_topics_length = buffer.readInt8() - 1; // Compact array
+  for (int i = 0; i < forgotten_topics_length; i++) {
+    ForgottenTopic topic;
+    buffer.readBytes(topic.topic_id.data(), 16); // Read UUID
+
+    int partitions_length = buffer.readInt8() - 1; // Compact array
+    for (int j = 0; j < partitions_length; j++) {
+      topic.partitions.push_back(buffer.readInt32());
+    }
+    request->forgotten_topics_data.push_back(topic);
+  }
+
+  request->rack_id = buffer.readCompactString();
+  buffer.readInt8(); // Tag buffer
+
+  return request;
+}

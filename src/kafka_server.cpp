@@ -1,12 +1,17 @@
 #include "include/kafka_server.hpp"
 #include "include/api_version_response.hpp"
 #include "include/describe_topics_partitions_response.hpp"
+#include "include/fetch_response.hpp"
+#include "include/kafka_errors.hpp"
+#include "include/kafka_parser.hpp"
+#include "include/kafka_request.hpp"
 #include "include/log_metadata_reader.hpp"
 #include <cstring>
 #include <errno.h>
 #include <fcntl.h>
 #include <iostream>
 #include <ostream>
+#include <string>
 #include <sys/socket.h>
 #include <system_error>
 #include <unistd.h>
@@ -46,6 +51,11 @@ void KafkaServer::registerHandlers() {
       [this](const KafkaRequest &request, char *response, int &offset) {
         handleDescribeTopicPartitions(request, response, offset);
       };
+
+  apiHandlers[FetchResponse::Fetch::KEY] = [this](const KafkaRequest &request,
+                                                  char *response, int &offset) {
+    handleFetch(request, response, offset);
+  };
 }
 
 KafkaServer::~KafkaServer() {
@@ -165,6 +175,35 @@ void KafkaServer::handleDescribeTopicPartitions(const KafkaRequest &request,
   for (const auto &topic_name : describe_request.topic_names) {
     auto metadata = reader.findTopic(topic_name);
     writer.writeTopic(topic_name, metadata);
+  }
+
+  writer.complete();
+  offset = writer.getOffset();
+}
+
+void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
+                              int &offset) {
+  const auto &header = request.header;
+  const auto &fetch_request = dynamic_cast<const FetchRequest &>(request);
+
+  FetchResponse writer(response);
+  writer.writeHeader(header.correlation_id, 0, 0, fetch_request.topics.size());
+
+  // For now, treat all topics as unknown
+  for (const auto &topic : fetch_request.topics) {
+    for (const auto &partition : topic.partitions) {
+      writer.writeTopicResponse(
+          topic.topic_id, partition.partition, ERROR_UNKNOWN_TOPIC_OR_PARTITION,
+          0,  // high_watermark
+          -1, // last_stable_offset
+          -1, // log_start_offset
+          std::vector<FetchResponse::AbortedTransaction>{}, // empty aborted
+                                                            // transactions
+          -1,      // preferred_read_replica
+          nullptr, // records data
+          0,       // records length
+          false);
+    }
   }
 
   writer.complete();

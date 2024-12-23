@@ -1,6 +1,6 @@
 #pragma once
 
-#include "kafka_parser.hpp"
+#include "kafka_request.hpp"
 #include "thread_pool.hpp"
 #include <cstdint>
 #include <functional>
@@ -27,6 +27,7 @@ private:
                          int &offset);
   void handleDescribeTopicPartitions(const KafkaRequest &request,
                                      char *response, int &offset);
+  void handleFetch(const KafkaRequest &request, char *response, int &offset);
 
   uint16_t port = 9092;
   int server_fd{-1};

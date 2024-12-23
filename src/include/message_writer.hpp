@@ -1,6 +1,8 @@
 #pragma once
 #include <arpa/inet.h>
+#include <cstdint>
 #include <cstring>
+#include <netinet/in.h>
 #include <string>
 
 template <typename Derived> class MessageWriter {
@@ -15,6 +17,15 @@ public:
     value = htonl(value);
     memcpy(buffer + offset, &value, sizeof(value));
     offset += sizeof(value);
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &writeInt64(int64_t value) {
+    // For 64-bit values we need to handle endianness manually
+    uint64_t network_value =
+        ((uint64_t)htonl(value & 0xFFFFFFFF) << 32) | htonl(value >> 32);
+    memcpy(buffer + offset, &network_value, sizeof(network_value));
+    offset += sizeof(network_value);
     return *static_cast<Derived *>(this);
   }
 
