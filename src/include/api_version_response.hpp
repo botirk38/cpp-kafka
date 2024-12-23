@@ -8,6 +8,7 @@ public:
   ApiVersionResponse &writeHeader(int32_t correlation_id, int16_t api_version);
   ApiVersionResponse &writeApiVersionSupport();
   ApiVersionResponse &writeDescribeTopicsSupport();
+  ApiVersionResponse &writeFetchSupport();
   ApiVersionResponse &writeMetadata();
   ApiVersionResponse &complete();
 

@@ -141,6 +141,7 @@ void KafkaServer::handleApiVersions(const KafkaRequest &request, char *response,
   writer.writeHeader(header.correlation_id, header.api_version)
       .writeApiVersionSupport()
       .writeDescribeTopicsSupport()
+      .writeFetchSupport()
       .writeMetadata()
       .complete();
 
