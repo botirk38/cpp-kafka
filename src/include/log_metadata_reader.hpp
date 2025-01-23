@@ -1,31 +1,30 @@
 #pragma once
-
 #include "kafka_metadata.hpp"
 #include "record_batch_reader.hpp"
-#include <optional>
 #include <string>
 
-using uint128_t = __uint128_t;
-
 class KafkaLogMetadataReader {
-
 public:
-  using PartitionMetadata = KafkaMetadata::PartitionMetadata;
+  using ClusterMetadata = KafkaMetadata::ClusterMetadata;
   using TopicMetadata = KafkaMetadata::TopicMetadata;
+  using PartitionMetadata = KafkaMetadata::PartitionMetadata;
 
-  explicit KafkaLogMetadataReader(const std::string &log_path);
+  explicit KafkaLogMetadataReader(const std::string &base_path);
 
-  std::optional<TopicMetadata> findTopic(const std::string &topic_name,
-                                         std::optional<int> partition_id = -1);
-
-  std::optional<TopicMetadata> findTopicById(const uint128_t &topic_id);
-
-  PartitionMetadata parsePartitionMetadata(const RecordReader::Record &record);
+  ClusterMetadata loadClusterMetadata();
+  std::vector<RecordBatchReader::RecordBatch>
+  readPartitionLog(const std::string &topic_name, int32_t partition_id);
 
 private:
-  std::string log_path;
-
-  TopicMetadata parseTopicMetadata(const RecordReader::Record &record);
+  const std::string base_path;
+  static constexpr uint8_t TOPIC_RECORD = 0x02;
+  static constexpr uint8_t PARTITION_RECORD = 0x03;
+  static constexpr char LOG_FILE[] = "00000000000000000000.log";
   std::vector<RecordBatchReader::RecordBatch>
   readAllBatches(std::ifstream &file);
+
+  TopicMetadata parseTopicMetadata(const RecordReader::Record &record);
+  PartitionMetadata parsePartitionMetadata(const RecordReader::Record &record);
+  std::string getPartitionLogPath(const std::string &topic_name,
+                                  int32_t partition_id);
 };

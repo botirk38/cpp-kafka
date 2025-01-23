@@ -1,16 +1,18 @@
 #pragma once
 
-#include <cstdint>
+#if defined(__APPLE__)
+#include <sys/_endian.h>
+#else
 #include <endian.h>
+#endif
+
+#include <cstdint>
 #include <fstream>
 #include <netinet/in.h>
 #include <type_traits>
 #include <vector>
 
 template <typename Derived> class ByteReader {
-private:
-  enum class IntegerSize { U16 = 2, U32 = 4, U64 = 8 };
-
 protected:
   std::ifstream &file;
 
@@ -23,29 +25,55 @@ protected:
     return *static_cast<Derived *>(this);
   }
 
+  Derived &readBytes(uint8_t *buffer, size_t length) {
+    file.read(reinterpret_cast<char *>(buffer), length);
+    return *static_cast<Derived *>(this);
+  }
+
   Derived &readBytes(std::vector<uint8_t> &buffer, size_t length) {
     buffer.resize(length);
     file.read(reinterpret_cast<char *>(buffer.data()), length);
     return *static_cast<Derived *>(this);
   }
 
-  template <typename T> Derived &readNetworkOrder(T &value) {
+  Derived &skipBytes(size_t count) {
+    file.seekg(count, std::ios::cur);
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &readUint16(uint16_t &value) {
     readRaw(value);
-    constexpr auto size = sizeof(T);
+    value = ntohs(value);
+    return *static_cast<Derived *>(this);
+  }
 
-    switch (static_cast<IntegerSize>(size)) {
-    case IntegerSize::U16:
-      value = ntohs(value);
-      break;
+  Derived &readInt16(int16_t &value) {
+    readRaw(value);
+    value = ntohs(value);
+    return *static_cast<Derived *>(this);
+  }
 
-    case IntegerSize::U32:
-      value = ntohl(value);
-      break;
+  Derived &readUint32(uint32_t &value) {
+    readRaw(value);
+    value = ntohl(value);
+    return *static_cast<Derived *>(this);
+  }
 
-    case IntegerSize::U64:
-      value = be64toh(value);
-      break;
-    }
+  Derived &readInt32(int32_t &value) {
+    readRaw(value);
+    value = ntohl(value);
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &readUint64(uint64_t &value) {
+    readRaw(value);
+    value = be64toh(value);
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &readInt64(int64_t &value) {
+    readRaw(value);
+    value = be64toh(value);
     return *static_cast<Derived *>(this);
   }
 
@@ -53,13 +81,11 @@ protected:
     value = 0;
     int shift = 0;
     uint8_t byte;
-
     do {
       readRaw(byte);
       value |= (byte & 0x7f) << shift;
       shift += 7;
     } while (byte & 0x80);
-
     return *static_cast<Derived *>(this);
   }
 
@@ -72,10 +98,24 @@ protected:
 
   Derived &readCompactString(std::string &value) {
     int16_t length;
-    readNetworkOrder(length);
+    readInt16(length);
     std::vector<char> buffer(length);
     file.read(buffer.data(), length);
     value.assign(buffer.data(), length);
+    return *static_cast<Derived *>(this);
+  }
+
+  template <typename T> Derived &readCompactArray(std::vector<T> &values) {
+    uint8_t count;
+    readRaw(count);
+    count--; // Compact format
+    values.clear();
+    values.reserve(count);
+    for (int i = 0; i < count; i++) {
+      T value;
+      readRaw(value);
+      values.push_back(value);
+    }
     return *static_cast<Derived *>(this);
   }
 };

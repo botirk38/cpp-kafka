@@ -2,19 +2,25 @@
 #include "include/api_version_response.hpp"
 #include "include/describe_topics_partitions_response.hpp"
 #include "include/fetch_response.hpp"
+#include "include/kafka_errors.hpp"
 #include "include/kafka_parser.hpp"
 #include "include/kafka_request.hpp"
 #include "include/log_metadata_reader.hpp"
+#include "include/record_batch_reader.hpp"
 #include <cstring>
 #include <errno.h>
 #include <fcntl.h>
 #include <iostream>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <sys/socket.h>
 #include <system_error>
 #include <unistd.h>
+
+std::ostream &operator<<(std::ostream &os, const uint128_t &value) {
+  return os << std::hex << "0x" << static_cast<uint64_t>(value >> 64)
+            << static_cast<uint64_t>(value);
+}
 
 KafkaServer::KafkaServer(uint16_t port)
     : port(port), thread_pool(std::thread::hardware_concurrency()) {
@@ -164,17 +170,27 @@ void KafkaServer::handleDescribeTopicPartitions(const KafkaRequest &request,
   const auto &describe_request =
       dynamic_cast<const DescribeTopicsRequest &>(request);
 
-  KafkaLogMetadataReader reader(
-      "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log");
+  KafkaLogMetadataReader reader("/tmp/kraft-combined-logs");
+  auto cluster_metadata = reader.loadClusterMetadata();
 
   DescribeTopicPartitionsResponse writer(response);
   writer.writeHeader(header.correlation_id,
                      describe_request.topic_names.size());
 
-  // Process each requested topic
   for (const auto &topic_name : describe_request.topic_names) {
-    auto metadata = reader.findTopic(topic_name);
-    writer.writeTopic(topic_name, metadata);
+    // Find topic by name in cluster metadata
+    auto topic_it = std::find_if(cluster_metadata.topics_by_id.begin(),
+                                 cluster_metadata.topics_by_id.end(),
+                                 [&topic_name](const auto &pair) {
+                                   return pair.second.name == topic_name;
+                                 });
+
+    std::optional<KafkaMetadata::TopicMetadata> topic_metadata =
+        topic_it != cluster_metadata.topics_by_id.end()
+            ? std::make_optional(topic_it->second)
+            : std::nullopt;
+
+    writer.writeTopic(topic_name, topic_metadata);
   }
 
   writer.complete();
@@ -185,33 +201,67 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
                               int &offset) {
   const auto &header = request.header;
   const auto &fetch_request = dynamic_cast<const FetchRequest &>(request);
+  int8_t topics_size = fetch_request.topics.size();
 
-  int8_t topics_size = fetch_request.topics.size() + 1;
+  std::cout << "Processing fetch request with " << (int)topics_size << " topics"
+            << std::endl;
 
   FetchResponse writer(response);
-  writer.writeHeader(header.correlation_id, 0, 0, topics_size);
-  KafkaLogMetadataReader reader(
-      "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log");
+  writer.writeHeader(header.correlation_id)
+      .writeResponseData(0, 0, 0, topics_size + 1);
 
-  // For now, treat all topics as unknown
+  std::cout << "Loading cluster metadata from /tmp/kraft-combined-logs"
+            << std::endl;
+  KafkaLogMetadataReader reader("/tmp/kraft-combined-logs");
+  auto cluster_metadata = reader.loadClusterMetadata();
+
+  std::cout << "Loaded cluster metadata" << std::endl;
+
   for (const auto &topic : fetch_request.topics) {
-    auto metadata = reader.findTopicById(topic.topic_id);
+    int8_t partition_count = topic.partitions.size();
+    std::cout << "Processing topic ID: " << topic.topic_id << " with "
+              << (int)partition_count << " partitions" << std::endl;
+
+    writer.writeTopicHeader(topic.topic_id, partition_count + 1);
+
+    auto topic_metadata = cluster_metadata.topics_by_id.find(topic.topic_id);
+    bool topic_exists = topic_metadata != cluster_metadata.topics_by_id.end();
+
+    if (!topic_exists) {
+      std::cout << "Topic ID " << topic.topic_id << " not found in metadata"
+                << std::endl;
+    }
 
     for (const auto &partition : topic.partitions) {
-      writer.writeTopicResponse(
-          topic.topic_id, partition.partition,
-          0,  // high_watermark
-          -1, // last_stable_offset
-          -1, // log_start_offset
-          std::vector<FetchResponse::AbortedTransaction>{}, // empty aborted
-                                                            // transactions
-          -1,      // preferred_read_replica
-          nullptr, // records data
-          0,       // records length
-          metadata != std::nullopt ? true : false);
+      std::cout << "Processing partition " << partition.partition << std::endl;
+
+      if (!topic_exists) {
+        std::cout << "Writing error response for unknown topic" << std::endl;
+        writer.writePartitionData(
+            partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
+            std::vector<FetchResponse::AbortedTransaction>{}, 0,
+            std::vector<RecordBatchReader::RecordBatch>{});
+        continue;
+      }
+
+      const auto &partition_metadata =
+          topic_metadata->second.partitions[partition.partition];
+      const auto &record_batches = partition_metadata.record_batches;
+
+      if (!record_batches.empty()) {
+
+        writer.writePartitionData(
+            partition.partition, 0, 0, 0, 0,
+            std::vector<FetchResponse::AbortedTransaction>{}, 1,
+            record_batches);
+      } else {
+        std::cout << "No record batches found for partition "
+                  << partition.partition << std::endl;
+      }
     }
   }
 
   writer.complete();
   offset = writer.getOffset();
+  std::cout << "Fetch response completed with offset: " << offset << std::endl;
 }

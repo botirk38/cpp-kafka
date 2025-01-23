@@ -1,9 +1,14 @@
 #pragma once
-
 #include "byte_reader.hpp"
+#include <iostream>
 
 class RecordReader : public ByteReader<RecordReader> {
 public:
+  struct Header {
+    std::string key;
+    std::vector<uint8_t> value;
+  };
+
   struct Record {
     int32_t length;
     int8_t attributes;
@@ -11,7 +16,7 @@ public:
     int32_t offset_delta;
     std::vector<uint8_t> key;
     std::vector<uint8_t> value;
-    int32_t headers_count;
+    std::vector<Header> headers;
   };
 
   explicit RecordReader(std::ifstream &file) : ByteReader(file) {}
@@ -30,31 +35,45 @@ public:
     int32_t key_length;
     readZigZagVarint(key_length);
     if (key_length >= 0) {
-      record.key.clear();
-      record.key.reserve(key_length);
-      for (int i = 0; i < key_length; i++) {
-        uint8_t byte;
-        readRaw(byte);
-        record.key.push_back(byte);
-      }
+      record.key.resize(key_length);
+      readBytes(record.key, key_length);
     }
 
     int32_t value_length;
     readZigZagVarint(value_length);
     if (value_length >= 0) {
-      record.value.clear();
-      record.value.reserve(value_length);
-      for (int i = 0; i < value_length; i++) {
-        uint8_t byte;
-        readRaw(byte);
-        record.value.push_back(byte);
-      }
+      record.value.resize(value_length);
+      readBytes(record.value, value_length);
     }
     return *this;
   }
 
-  RecordReader &readHeaders() { return readVarint(record.headers_count); }
+  RecordReader &readHeaders() {
+    int32_t headers_count;
+    readVarint(headers_count);
 
+    for (int i = 0; i < headers_count; i++) {
+      Header header;
+
+      // Read header key
+      int32_t key_length;
+      readVarint(key_length);
+      std::vector<char> key_chars(key_length);
+      readBytes(reinterpret_cast<uint8_t *>(key_chars.data()), key_length);
+      header.key = std::string(key_chars.begin(), key_chars.end());
+
+      // Read header value
+      int32_t value_length;
+      readVarint(value_length);
+      if (value_length >= 0) {
+        header.value.resize(value_length);
+        readBytes(header.value, value_length);
+      }
+
+      record.headers.push_back(std::move(header));
+    }
+    return *this;
+  }
   Record complete() { return std::move(record); }
 
 private:
@@ -70,7 +89,7 @@ public:
     int32_t batch_length;
     int32_t partition_leader_epoch;
     int8_t magic_byte;
-    int32_t crc;
+    uint32_t crc;
     int16_t attributes;
     int32_t last_offset_delta;
     int64_t base_timestamp;
@@ -85,25 +104,31 @@ public:
   explicit RecordBatchReader(std::ifstream &file) : ByteReader(file) {}
 
   RecordBatchReader &readHeader() {
-    return readNetworkOrder(batch.base_offset)
-        .readNetworkOrder(batch.batch_length)
-        .readNetworkOrder(batch.partition_leader_epoch)
-        .readRaw(batch.magic_byte)
-        .readNetworkOrder(batch.crc);
+    readInt64(batch.base_offset)
+        .readInt32(batch.batch_length)
+        .readInt32(batch.partition_leader_epoch)
+        .readRaw(batch.magic_byte);
+
+    readUint32(batch.crc);
+    std::cout << "CRC Batch: " << std::hex << batch.crc << std::dec
+              << std::endl;
+
+    return *this;
   }
 
   RecordBatchReader &readMetadata() {
-    return readNetworkOrder(batch.attributes)
-        .readNetworkOrder(batch.last_offset_delta)
-        .readNetworkOrder(batch.base_timestamp)
-        .readNetworkOrder(batch.max_timestamp)
-        .readNetworkOrder(batch.producer_id)
-        .readNetworkOrder(batch.producer_epoch)
-        .readNetworkOrder(batch.base_sequence)
-        .readNetworkOrder(batch.records_count);
+    return readInt16(batch.attributes)
+        .readInt32(batch.last_offset_delta)
+        .readInt64(batch.base_timestamp)
+        .readInt64(batch.max_timestamp)
+        .readInt64(batch.producer_id)
+        .readInt16(batch.producer_epoch)
+        .readInt32(batch.base_sequence)
+        .readInt32(batch.records_count);
   }
 
   RecordBatchReader &readRecords() {
+    batch.records.reserve(batch.records_count);
     for (int i = 0; i < batch.records_count; i++) {
       batch.records.push_back(RecordReader(file)
                                   .readLength()

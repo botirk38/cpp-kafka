@@ -22,6 +22,13 @@ public:
     return *static_cast<Derived *>(this);
   }
 
+  Derived &writeUInt32(uint32_t value) {
+    uint32_t network_value = htonl(value);
+    memcpy(buffer + offset, &network_value, sizeof(network_value));
+    offset += sizeof(network_value);
+    return *static_cast<Derived *>(this);
+  }
+
   Derived &writeInt64(int64_t value) {
     // For 64-bit values we need to handle endianness manually
     uint64_t network_value =
@@ -75,6 +82,19 @@ public:
     }
 
     offset += length;
+
+    return *static_cast<Derived *>(this);
+  }
+
+  Derived &writeVarInt(uint64_t value) {
+    do {
+      uint8_t byte = value & 0x7F;
+      value >>= 7;
+      if (value) {
+        byte |= 0x80;
+      }
+      writeUInt8(byte);
+    } while (value);
 
     return *static_cast<Derived *>(this);
   }
