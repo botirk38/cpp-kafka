@@ -92,8 +92,15 @@ FetchResponse &FetchResponse::writeRecordBatchHeader(
 }
 
 FetchResponse &FetchResponse::writeRecord(const RecordReader::Record &record) {
-  writeVarInt(static_cast<int64_t>(record.length + 1)) // Length placeholder
-      .writeInt8(record.attributes)
+  // Save the current offset to calculate length later
+  int lengthOffset = offset;
+  // Skip the length field for now
+  writeVarInt(0);
+
+  int recordStart = offset;
+
+  // Write all record fields
+  writeInt8(record.attributes)
       .writeVarInt(record.timestamp_delta)
       .writeVarInt(static_cast<int64_t>(record.offset_delta));
 
@@ -108,8 +115,23 @@ FetchResponse &FetchResponse::writeRecord(const RecordReader::Record &record) {
   writeVarInt(static_cast<uint64_t>(record.value.size()))
       .writeBytes(record.value.data(), record.value.size());
 
-  return writeVarInt(static_cast<int64_t>(record.headers.size()))
+  writeVarInt(static_cast<int64_t>(record.headers.size()))
       .writeRecordHeaders(record.headers);
+
+  // Calculate actual record length
+  int recordLength = offset - recordStart;
+
+  // Store current offset
+  int currentOffset = offset;
+
+  // Go back and write the length
+  offset = lengthOffset;
+  writeVarInt(static_cast<int64_t>(recordLength));
+
+  // Restore offset
+  offset = currentOffset;
+
+  return *this;
 }
 
 FetchResponse &FetchResponse::writeRecordHeaders(
