@@ -1,4 +1,6 @@
 #include "include/fetch_response.hpp"
+#include <crc32c/crc32c.h>
+#include <cstdint>
 
 FetchResponse &FetchResponse::writeHeader(int32_t correlation_id) {
   skipBytes(4) // Message size placeholder
@@ -49,33 +51,65 @@ FetchResponse &FetchResponse::writeAbortedTransactions(
 
 FetchResponse &FetchResponse::writeRecordBatchHeader(
     const RecordBatchReader::RecordBatch &batch) {
-  writeInt64(batch.base_offset)
-      .writeInt32(batch.batch_length + 1)
-      .writeInt32(batch.partition_leader_epoch)
-      .writeInt8(batch.magic_byte)
-      .writeUInt32(batch.crc)
-      .writeInt16(batch.attributes)
+  int start_offset = offset;
+
+  writeInt64(batch.base_offset);
+  int batch_length_offset = offset;
+  writeInt32(0); // BatchLength placeholder
+  writeInt32(batch.partition_leader_epoch);
+  writeInt8(batch.magic_byte); // Magic value is 2
+
+  int crc_start_offset = offset;
+  writeInt32(0); // CRC placeholder
+  int crc_end_offset = offset;
+
+  writeInt16(batch.attributes)
       .writeInt32(batch.last_offset_delta)
       .writeInt64(batch.base_timestamp)
       .writeInt64(batch.max_timestamp)
       .writeInt64(batch.producer_id)
       .writeInt16(batch.producer_epoch)
       .writeInt32(batch.base_sequence)
-      .writeInt32(batch.records_count);
+      .writeInt32(static_cast<int32_t>(batch.records_count));
+
+  for (int32_t i = 0; i < batch.records.size(); i++) {
+    auto record = batch.records[i];
+    record.offset_delta = i; // Set consecutive offset deltas
+    writeRecord(record);
+  }
+
+  int batch_length = offset - 12 - start_offset;
+  uint32_t network_length = htonl(batch_length);
+  memcpy(buffer + batch_length_offset, &network_length, sizeof(network_length));
+
+  uint32_t computed_crc =
+      crc32c::Crc32c(reinterpret_cast<const uint8_t *>(buffer + crc_end_offset),
+                     offset - crc_end_offset);
+  uint32_t network_crc = htonl(computed_crc);
+  memcpy(buffer + crc_start_offset, &network_crc, sizeof(network_crc));
+
   return *this;
 }
 
 FetchResponse &FetchResponse::writeRecord(const RecordReader::Record &record) {
-  writeVarInt(record.length)
+  writeVarInt(static_cast<int64_t>(record.length + 1)) // Length placeholder
       .writeInt8(record.attributes)
       .writeVarInt(record.timestamp_delta)
-      .writeVarInt(record.offset_delta)
-      .writeVarInt(record.key.size())
-      .writeBytes(record.key.data(), record.key.size())
-      .writeVarInt(record.value.size())
-      .writeBytes(record.value.data(), record.value.size())
-      .writeVarInt(record.headers.size());
-  return writeRecordHeaders(record.headers);
+      .writeVarInt(static_cast<int64_t>(record.offset_delta));
+
+  // Handle key
+  if (record.key.empty()) {
+    writeVarInt(1);
+  } else {
+    writeVarInt(static_cast<uint64_t>(record.key.size() + 1));
+    writeBytes(record.key.data(), record.key.size());
+  }
+
+  writeVarInt(static_cast<uint64_t>(record.value.size()))
+      .writeBytes(record.value.data(), record.value.size());
+
+  return writeVarInt(static_cast<int64_t>(record.headers.size()))
+      .writeRecordHeaders(record.headers);
 }
 
 FetchResponse &FetchResponse::writeRecordHeaders(
@@ -99,7 +133,7 @@ FetchResponse::writeRecords(const RecordBatchReader::RecordBatch &batch) {
 
 FetchResponse &FetchResponse::writeRecordBatches(
     const std::vector<RecordBatchReader::RecordBatch> &record_batches) {
-  writeVarInt(record_batches.size() + 1);
+  writeVarInt(static_cast<int64_t>(record_batches.size() + 1));
   for (const auto &batch : record_batches) {
     writeRecordBatchHeader(batch).writeRecords(batch);
   }
@@ -127,4 +161,3 @@ FetchResponse &FetchResponse::complete() {
   updateMessageSize();
   return *this;
 }
-
