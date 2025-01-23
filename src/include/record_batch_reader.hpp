@@ -1,5 +1,6 @@
 #pragma once
 #include "byte_reader.hpp"
+#include <crc32c/crc32c.h>
 #include <iostream>
 
 class RecordReader : public ByteReader<RecordReader> {
@@ -104,14 +105,30 @@ public:
   explicit RecordBatchReader(std::ifstream &file) : ByteReader(file) {}
 
   RecordBatchReader &readHeader() {
+    // Read fields before CRC
     readInt64(batch.base_offset)
         .readInt32(batch.batch_length)
         .readInt32(batch.partition_leader_epoch)
         .readRaw(batch.magic_byte);
 
-    readUint32(batch.crc);
-    std::cout << "CRC Batch: " << std::hex << batch.crc << std::dec
-              << std::endl;
+    // Store current position (start of CRC field)
+    std::streampos crc_start = file.tellg();
+
+    // Skip over CRC field
+    file.seekg(crc_start + static_cast<std::streamoff>(sizeof(uint32_t)));
+
+    // Read all data from attributes to end of batch for CRC calculation
+    std::vector<uint8_t> crc_data;
+    crc_data.resize(batch.batch_length -
+                    (sizeof(batch.partition_leader_epoch) +
+                     sizeof(batch.magic_byte) + sizeof(batch.crc)));
+    readBytes(crc_data, crc_data.size());
+
+    // Calculate CRC32C over the data
+    batch.crc = crc32c::Crc32c(crc_data.data(), crc_data.size());
+
+    // Return to position after CRC field
+    file.seekg(crc_start + static_cast<std::streamoff>(sizeof(uint32_t)));
 
     return *this;
   }
