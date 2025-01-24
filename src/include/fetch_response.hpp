@@ -42,13 +42,5 @@ public:
   FetchResponse &writeRecordBatches(
       const std::vector<RecordBatchReader::RecordBatch> &record_batches);
 
-  FetchResponse &
-  writeRecordBatchHeader(const RecordBatchReader::RecordBatch &batch);
-  FetchResponse &writeRecords(const RecordBatchReader::RecordBatch &batch);
-  FetchResponse &writeRecord(const RecordReader::Record &record);
-  FetchResponse &
-  writeRecordHeaders(const std::vector<RecordReader::Header> &headers);
-
   FetchResponse &complete();
 };
-

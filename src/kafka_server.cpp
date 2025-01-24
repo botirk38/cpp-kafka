@@ -248,13 +248,11 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
           topic_metadata->second.partitions[partition.partition];
       const auto &record_batches = partition_metadata.record_batches;
 
-      if (!record_batches.empty()) {
+      writer.writePartitionData(
+          partition.partition, 0, 0, 0, 0,
+          std::vector<FetchResponse::AbortedTransaction>{}, 1, record_batches);
 
-        writer.writePartitionData(
-            partition.partition, 0, 0, 0, 0,
-            std::vector<FetchResponse::AbortedTransaction>{}, 1,
-            record_batches);
-      } else {
+      if (record_batches.empty()) {
         std::cout << "No record batches found for partition "
                   << partition.partition << std::endl;
       }
