@@ -1,5 +1,6 @@
 #include "include/describe_topics_partitions_response.hpp"
 #include "include/fetch_response.hpp"
+#include <array>
 #include <netinet/in.h>
 #include <optional>
 
