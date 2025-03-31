@@ -8,7 +8,6 @@ KafkaLogMetadataReader::KafkaLogMetadataReader(const std::string &base_path)
 std::vector<RecordBatchReader::RecordBatch>
 KafkaLogMetadataReader::readAllBatches(std::ifstream &file) {
   std::vector<RecordBatchReader::RecordBatch> batches;
-  size_t batch_count = 0;
 
   while (file.good() && !file.eof()) {
     if (file.peek() == EOF) {
@@ -22,7 +21,6 @@ KafkaLogMetadataReader::readAllBatches(std::ifstream &file) {
                      .complete();
 
     batches.push_back(std::move(batch));
-    batch_count++;
   }
   return batches;
 }
@@ -184,4 +182,3 @@ KafkaLogMetadataReader::getPartitionLogPath(const std::string &topic_name,
   return base_path + "/" + topic_name + "-" + std::to_string(partition_id) +
          "/" + LOG_FILE;
 }
-

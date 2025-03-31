@@ -18,8 +18,8 @@ public:
 
   FetchResponse &writeHeader(int32_t correlation_id);
   FetchResponse &writeResponseData(int32_t throttle_time_ms, int16_t error_code,
-                                   int32_t session_id, int8_t topic_count);
-  FetchResponse &writeTopicHeader(uint128_t topic_id, int8_t partition_count);
+                                   int32_t session_id, int64_t topic_count);
+  FetchResponse &writeTopicHeader(uint128_t topic_id, int64_t partition_count);
 
   // Partition data writing methods
   FetchResponse &writePartitionData(

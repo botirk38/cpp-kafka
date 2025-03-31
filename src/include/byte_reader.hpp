@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <fstream>
+#include <iostream>
 #include <netinet/in.h>
 #include <type_traits>
 #include <vector>

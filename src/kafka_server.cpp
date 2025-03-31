@@ -203,19 +203,16 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
   const auto &fetch_request = dynamic_cast<const FetchRequest &>(request);
   int8_t topics_size = fetch_request.topics.size();
 
-  std::cout << "Processing fetch request with " << (int)topics_size << " topics"
-            << std::endl;
+  
 
   FetchResponse writer(response);
   writer.writeHeader(header.correlation_id)
       .writeResponseData(0, 0, 0, topics_size + 1);
 
-  std::cout << "Loading cluster metadata from /tmp/kraft-combined-logs"
-            << std::endl;
+ 
   KafkaLogMetadataReader reader("/tmp/kraft-combined-logs");
   auto cluster_metadata = reader.loadClusterMetadata();
 
-  std::cout << "Loaded cluster metadata" << std::endl;
 
   for (const auto &topic : fetch_request.topics) {
     int8_t partition_count = topic.partitions.size();
@@ -250,7 +247,7 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
 
       writer.writePartitionData(
           partition.partition, 0, 0, 0, 0,
-          std::vector<FetchResponse::AbortedTransaction>{}, 1, record_batches);
+          std::vector<FetchResponse::AbortedTransaction>{}, 0, record_batches);
 
       if (record_batches.empty()) {
         std::cout << "No record batches found for partition "

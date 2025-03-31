@@ -102,7 +102,6 @@ public:
     std::vector<Record> records;
 
     std::vector<uint8_t> raw_data;
-    size_t raw_data_size;
   };
 
   explicit RecordBatchReader(std::ifstream &file) : ByteReader(file) {}
@@ -114,8 +113,8 @@ public:
     readInt64(batch.base_offset)
         .readInt32(batch.batch_length)
         .readInt32(batch.partition_leader_epoch)
-        .readRaw(batch.magic_byte);
-    readUint32(batch.crc);
+        .readRaw(batch.magic_byte)
+        .readUint32(batch.crc);
 
     // Store raw data
     auto current_pos = file.tellg();
@@ -124,12 +123,11 @@ public:
     batch.raw_data.resize(batch.batch_length + 12); // Include header size
     file.read(reinterpret_cast<char *>(batch.raw_data.data()),
               batch.batch_length + 12);
-    batch.raw_data_size = batch.batch_length + 12;
 
     // Restore position
     file.seekg(current_pos);
 
-    std::cout << "CRC Batch: " << std::hex << batch.crc << std::dec
+    std::cout << "CRC Batch: " << std::hex << htonl(batch.crc) << std::dec
               << std::endl;
     return *this;
   }

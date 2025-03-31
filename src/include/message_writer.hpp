@@ -86,14 +86,14 @@ public:
     return *static_cast<Derived *>(this);
   }
 
-  Derived &writeVarInt(uint64_t value) {
+  Derived &writeVarInt(int64_t value) {
     do {
-      uint8_t byte = value & 0x7F;
+      int8_t byte = value & 0x7F;
       value >>= 7;
       if (value) {
         byte |= 0x80;
       }
-      writeUInt8(byte);
+      writeInt8(byte);
     } while (value);
 
     return *static_cast<Derived *>(this);

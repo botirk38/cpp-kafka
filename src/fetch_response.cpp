@@ -12,18 +12,18 @@ FetchResponse &FetchResponse::writeHeader(int32_t correlation_id) {
 FetchResponse &FetchResponse::writeResponseData(int32_t throttle_time_ms,
                                                 int16_t error_code,
                                                 int32_t session_id,
-                                                int8_t topic_count) {
+                                                int64_t topic_count) {
   std::cout << "Topic Count: " << topic_count;
   writeInt32(throttle_time_ms)
       .writeInt16(error_code)
       .writeInt32(session_id)
-      .writeVarInt(topic_count);
+      .writeVarInt(static_cast<int64_t>(topic_count));
   return *this;
 }
 
 FetchResponse &FetchResponse::writeTopicHeader(uint128_t topic_id,
-                                               int8_t partition_count) {
-  writeUint128(topic_id).writeVarInt(partition_count);
+                                               int64_t partition_count) {
+  writeUint128(topic_id).writeVarInt(static_cast<int64_t>(partition_count));
   return *this;
 }
 
@@ -51,23 +51,22 @@ FetchResponse &FetchResponse::writeAbortedTransactions(
 
 FetchResponse &FetchResponse::writeRecordBatches(
     const std::vector<RecordBatchReader::RecordBatch> &record_batches) {
-  int start_pos = offset;
-  writeVarInt(0);
+  // Calculate total size upfront
+    size_t total_size = 0;
+    for (const auto &batch : record_batches) {
+        total_size += batch.raw_data.size();
+    }
 
-  for (const auto &batch : record_batches) {
-    writeBytes(batch.raw_data.data(), batch.raw_data_size);
-  }
+    // Write the total size once we know it
+    writeVarInt(static_cast<int64_t>(total_size));
 
-  int bytes_written = offset - start_pos - 1;
-  int end_pos = offset;
+    // Write all batches sequentially
+    for (const auto &batch : record_batches) {
+        writeBytes(batch.raw_data.data(), batch.raw_data.size());
+    }
 
-  offset = start_pos;
-  writeVarInt(static_cast<int64_t>(bytes_written));
-  offset = end_pos;
-
-  writeInt8(0);
-
-  return *this;
+    writeInt8(0); // terminator
+    return *this;
 }
 
 FetchResponse &FetchResponse::writePartitionData(
@@ -91,4 +90,3 @@ FetchResponse &FetchResponse::complete() {
   updateMessageSize();
   return *this;
 }
-
