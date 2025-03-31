@@ -1,3 +1,6 @@
 {
-    "dependencies": []
+  "name": "codecrafters-kafka",
+  "version": "1.0.0",
+  "dependencies": ["spdlog"]
 }
+

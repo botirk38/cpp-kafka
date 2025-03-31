@@ -1,5 +1,4 @@
 #include "include/fetch_response.hpp"
-#include <crc32c/crc32c.h>
 #include <cstdint>
 
 FetchResponse &FetchResponse::writeHeader(int32_t correlation_id) {
@@ -13,7 +12,6 @@ FetchResponse &FetchResponse::writeResponseData(int32_t throttle_time_ms,
                                                 int16_t error_code,
                                                 int32_t session_id,
                                                 int64_t topic_count) {
-  std::cout << "Topic Count: " << topic_count;
   writeInt32(throttle_time_ms)
       .writeInt16(error_code)
       .writeInt32(session_id)

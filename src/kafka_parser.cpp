@@ -3,7 +3,6 @@
 #include "include/describe_topics_partitions_response.hpp"
 #include "include/fetch_response.hpp"
 #include <arpa/inet.h>
-#include <iostream>
 
 using ApiVersion = ApiVersionResponse::ApiVersions;
 using DescribeTopics = DescribeTopicPartitionsResponse::DescribeTopicPartitions;
@@ -120,12 +119,9 @@ Parser::parseDescribeTopics(Buffer &buffer, RequestHeader header) {
   auto request = std::make_unique<DescribeTopicsRequest>();
   request->header = std::move(header);
 
-  std::cout << "Parsing DescribeTopics request" << std::endl;
 
   buffer.skip(1); // TAG_BUFFER
   auto topics_length = buffer.readInt8() - 1;
-  std::cout << "Topics array length: " << static_cast<int>(topics_length)
-            << std::endl;
 
   for (int i = 0; i < topics_length; i++) {
     auto topic_name = buffer.readCompactString();

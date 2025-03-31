@@ -1,6 +1,5 @@
 #pragma once
 #include "byte_reader.hpp"
-#include <iostream>
 
 class RecordReader : public ByteReader<RecordReader> {
 public:
@@ -127,8 +126,6 @@ public:
     // Restore position
     file.seekg(current_pos);
 
-    std::cout << "CRC Batch: " << std::hex << htonl(batch.crc) << std::dec
-              << std::endl;
     return *this;
   }
 

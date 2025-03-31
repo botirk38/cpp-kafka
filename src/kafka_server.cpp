@@ -80,7 +80,6 @@ void KafkaServer::start() {
     throw std::system_error(errno, std::generic_category(), "Failed to listen");
   }
 
-  std::cout << "Server listening on port " << port << std::endl;
 
   while (true) {
     struct sockaddr_in client_addr{};
@@ -216,24 +215,17 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
 
   for (const auto &topic : fetch_request.topics) {
     int8_t partition_count = topic.partitions.size();
-    std::cout << "Processing topic ID: " << topic.topic_id << " with "
-              << (int)partition_count << " partitions" << std::endl;
 
     writer.writeTopicHeader(topic.topic_id, partition_count + 1);
 
     auto topic_metadata = cluster_metadata.topics_by_id.find(topic.topic_id);
     bool topic_exists = topic_metadata != cluster_metadata.topics_by_id.end();
 
-    if (!topic_exists) {
-      std::cout << "Topic ID " << topic.topic_id << " not found in metadata"
-                << std::endl;
-    }
+
 
     for (const auto &partition : topic.partitions) {
-      std::cout << "Processing partition " << partition.partition << std::endl;
 
       if (!topic_exists) {
-        std::cout << "Writing error response for unknown topic" << std::endl;
         writer.writePartitionData(
             partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
             std::vector<FetchResponse::AbortedTransaction>{}, 0,
@@ -249,14 +241,9 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
           partition.partition, 0, 0, 0, 0,
           std::vector<FetchResponse::AbortedTransaction>{}, 0, record_batches);
 
-      if (record_batches.empty()) {
-        std::cout << "No record batches found for partition "
-                  << partition.partition << std::endl;
-      }
     }
   }
 
   writer.complete();
   offset = writer.getOffset();
-  std::cout << "Fetch response completed with offset: " << offset << std::endl;
 }
