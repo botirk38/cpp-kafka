@@ -1,7 +1,9 @@
 #pragma once
 
 #if defined(__APPLE__)
-#include <sys/_endian.h>
+#include <libkern/OSByteOrder.h>
+#define be64toh(x) OSSwapBigToHostInt64(x)
+#define htobe64(x) OSSwapHostToBigInt64(x)
 #else
 #include <endian.h>
 #endif
