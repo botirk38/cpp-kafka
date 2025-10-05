@@ -1,7 +1,7 @@
 #pragma once
 
-#include "kafka_metadata.hpp"
-#include "message_writer.hpp"
+#include "../../../common/include/kafka_metadata.hpp"
+#include "../../base/include/message_writer.hpp"
 #include <optional>
 #include <string>
 

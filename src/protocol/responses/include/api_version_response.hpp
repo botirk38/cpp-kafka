@@ -1,5 +1,5 @@
 #pragma once
-#include "message_writer.hpp"
+#include "../../base/include/message_writer.hpp"
 
 class ApiVersionResponse : public MessageWriter<ApiVersionResponse> {
 public:

@@ -1,5 +1,5 @@
 #pragma once
-#include "kafka_metadata.hpp"
+#include "../../common/include/kafka_metadata.hpp"
 #include "record_batch_reader.hpp"
 #include <string>
 

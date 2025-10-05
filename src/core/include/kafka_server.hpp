@@ -1,6 +1,6 @@
 #pragma once
 
-#include "kafka_request.hpp"
+#include "../../protocol/base/include/kafka_request.hpp"
 #include "thread_pool.hpp"
 #include <cstdint>
 #include <functional>

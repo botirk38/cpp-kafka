@@ -1,7 +1,7 @@
 #include "include/kafka_parser.hpp"
-#include "include/api_version_response.hpp"
-#include "include/describe_topics_partitions_response.hpp"
-#include "include/fetch_response.hpp"
+#include "../protocol/responses/include/api_version_response.hpp"
+#include "../protocol/responses/include/describe_topics_partitions_response.hpp"
+#include "../protocol/responses/include/fetch_response.hpp"
 #include <arpa/inet.h>
 
 using ApiVersion = ApiVersionResponse::ApiVersions;

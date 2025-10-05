@@ -1,10 +1,10 @@
 #pragma once
 
-#include "api_version_request.hpp"
-#include "describe_topic_partitions_request.hpp"
-#include "fetch_request.hpp"
-#include "fetch_response.hpp"
-#include "kafka_request.hpp"
+#include "../../protocol/requests/include/api_version_request.hpp"
+#include "../../protocol/requests/include/describe_topic_partitions_request.hpp"
+#include "../../protocol/requests/include/fetch_request.hpp"
+#include "../../protocol/responses/include/fetch_response.hpp"
+#include "../../protocol/base/include/kafka_request.hpp"
 #include <cstdint>
 #include <cstring>
 #include <memory>

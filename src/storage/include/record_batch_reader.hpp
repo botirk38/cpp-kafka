@@ -1,5 +1,5 @@
 #pragma once
-#include "byte_reader.hpp"
+#include "../../protocol/base/include/byte_reader.hpp"
 
 class RecordReader : public ByteReader<RecordReader> {
 public:

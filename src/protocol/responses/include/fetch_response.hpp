@@ -1,6 +1,6 @@
 #pragma once
-#include "message_writer.hpp"
-#include "record_batch_reader.hpp"
+#include "../../base/include/message_writer.hpp"
+#include "../../../storage/include/record_batch_reader.hpp"
 #include <vector>
 
 using uint128_t = __uint128_t;
