@@ -79,10 +79,11 @@ src/
 │   ├── requests/include/    # Request types
 │   ├── responses/           # Response types and implementations
 │   └── tests/               # Protocol module tests
-├── storage/                 # Data persistence
-│   ├── include/             # Storage headers
-│   ├── tests/               # Storage module tests
-│   └── *.cpp                # Storage implementation
+├── storage/                 # Data persistence (layered)
+│   ├── include/             # Public API (IStorageService, storage types)
+│   ├── io/, metadata/, log/ # Path resolver, metadata store, batch scanner, log store
+│   ├── internal/            # StorageService implementation
+│   └── tests/               # Storage module tests
 └── common/include/          # Shared utilities
 ```
 
@@ -94,7 +95,7 @@ src/
 | **KafkaParser** | Binary protocol parser for Kafka messages |
 | **ThreadPool** | Concurrent request handler |
 | **MessageWriter/ByteReader** | CRTP-based binary serialization |
-| **LogMetadataReader** | Cluster and topic metadata management |
+| **IStorageService** | Storage API; cluster snapshot, topic lookup, partition data |
 
 ## Supported Operations
 
@@ -127,7 +128,6 @@ ctest --test-dir build --output-on-failure
 - `-DENABLE_ASAN=ON` - Enable AddressSanitizer
 - `-DENABLE_UBSAN=ON` - Enable UndefinedBehaviorSanitizer
 - `-DUSE_CPP26=ON` - Use C++26 (requires GCC 14+ / Clang 18+)
-- `-DENABLE_CPP_MODULES=ON` - Use C++20 modules (requires Ninja: `cmake -G Ninja -B build -S . -DENABLE_CPP_MODULES=ON`)
 
 ### Project Guidelines
 

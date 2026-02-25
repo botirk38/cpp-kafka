@@ -2,11 +2,6 @@ cmake_minimum_required(VERSION 3.28)
 project(cpp-kafka LANGUAGES CXX)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
-option(ENABLE_CPP_MODULES "Use C++20 modules (requires Ninja)" OFF)
-
-if(ENABLE_CPP_MODULES AND NOT CMAKE_GENERATOR MATCHES "Ninja")
-  message(FATAL_ERROR "ENABLE_CPP_MODULES=ON requires Ninja. Use: cmake -G Ninja -B build -S . -DENABLE_CPP_MODULES=ON")
-endif()
 
 enable_testing()
 

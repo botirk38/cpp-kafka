@@ -37,10 +37,13 @@ src/
 │   │   ├── include/*.hpp    # Response headers
 │   │   └── *.cpp            # Response implementations
 │   └── tests/               # Protocol module tests
-├── storage/                 # Storage layer
-│   ├── include/*.hpp        # Storage headers
-│   ├── tests/               # Storage module tests
-│   └── *.cpp                # Storage implementations
+├── storage/                 # Storage layer (layered: io, metadata, log, internal)
+│   ├── include/             # Public API (storage_service, storage_types, storage_error)
+│   ├── io/                  # Path resolution, binary cursor
+│   ├── metadata/            # Metadata decoder, record extractor, metadata store
+│   ├── log/                 # Batch scanner, log store
+│   ├── internal/            # StorageService implementation
+│   └── tests/               # Storage module tests
 ├── common/include/          # Common utilities (errors, metadata)
 └── main.cpp
 ```
@@ -56,7 +59,7 @@ ctest --test-dir build --output-on-failure
 - **KafkaServer** (`src/core/`): Main server class that listens on port 9092, manages client connections using a thread pool, and routes requests to appropriate handlers
 - **KafkaParser** (`src/core/`): Handles parsing of incoming Kafka protocol messages
 - **ThreadPool** (`src/core/`): Manages concurrent client connections
-- **LogMetadataReader** (`src/storage/`): Reads log metadata and record batches from disk
+- **IStorageService** (`src/storage/include/`): Storage API; `createStorageService(base_path)` returns implementation. Uses MetadataStore + LogStore internally.
 
 ### Request/Response System
 
@@ -76,8 +79,8 @@ The server implements a handler-based architecture where each Kafka API has dedi
 ### Key Data Structures
 
 - **RequestHeader**: Standard Kafka request header (api_key, api_version, correlation_id, client_id)
-- **RecordBatch**: Container for log records with headers and compressed data
-- **TopicMetadata**: Contains topic information including partitions and replicas
+- **storage::TopicInfo, PartitionInfo, ClusterSnapshot**: Storage domain types (no protocol dependency)
+- **RecordBatches** (protocol): `std::vector<std::vector<uint8_t>>` for raw record batch bytes
 
 ## Project Configuration
 
@@ -98,9 +101,7 @@ Response classes inherit from MessageWriter:
 - `ApiVersionsResponse : public MessageWriter<ApiVersionsResponse>`
 - `DescribeTopicPartitionsResponse : public MessageWriter<DescribeTopicPartitionsResponse>`
 
-Reader classes inherit from ByteReader:
-- `LogMetadataReader : public ByteReader<LogMetadataReader>`
-- `RecordBatchReader : public ByteReader<RecordBatchReader>`
+Storage uses its own `io::BinaryCursor` (no protocol dependency). Protocol fetch response accepts `RecordBatches` (neutral bytes).
 
 ## Development Notes
 

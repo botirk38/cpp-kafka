@@ -14,12 +14,12 @@ DescribeTopicPartitionsResponse::writeHeader(int32_t correlation_id, int8_t topi
   return *this;
 }
 
-DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
-    const std::string &topic_name,
-    const std::optional<KafkaMetadata::TopicMetadata> &topic_metadata) {
+DescribeTopicPartitionsResponse &
+DescribeTopicPartitionsResponse::writeTopic(const std::string &topic_name,
+                                            const std::optional<storage::TopicInfo> &topic_info) {
 
-  if (topic_metadata) {
-    writeTopicMetadata(topic_name, topic_metadata->topic_id, topic_metadata->partitions);
+  if (topic_info) {
+    writeTopicMetadata(topic_name, topic_info->topic_id, topic_info->partitions);
   } else {
     writeUnknownTopicError(topic_name);
   }
@@ -28,17 +28,17 @@ DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
 }
 
 DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopicMetadata(
-    const std::string &topic_name, const uint128_t topic_id,
-    const std::vector<KafkaMetadata::PartitionMetadata> &partition_metadata) {
-  const int8_t num_partitions = partition_metadata.size();
-  writeInt16(0)                           // error_code
-      .writeInt8(topic_name.length() + 1) // Compact string length
+    const std::string &topic_name, storage::TopicId topic_id,
+    const std::vector<storage::PartitionInfo> &partitions) {
+  const int8_t num_partitions = static_cast<int8_t>(partitions.size());
+  writeInt16(0)                                                // error_code
+      .writeInt8(static_cast<int8_t>(topic_name.length() + 1)) // Compact string length
       .writeCompactString(topic_name)
-      .writeUint128(topic_id)
+      .writeUint128(topic_id.value)
       .writeInt8(0)                   // is_internal
       .writeInt8(num_partitions + 1); // partitions array length (length + 1)
 
-  for (auto &partition : partition_metadata) {
+  for (const auto &partition : partitions) {
     writePartitionMetadata(partition.partition_id);
   }
 

@@ -11,9 +11,6 @@ target_link_libraries(kafka_core PUBLIC
   kafka_storage
   kafka_common
 )
-if(ENABLE_CPP_MODULES)
-  target_compile_definitions(kafka_core PRIVATE USE_CPP_MODULES=1)
-endif()
 if(spdlog_FOUND)
   target_link_libraries(kafka_core PRIVATE spdlog::spdlog)
 endif()

@@ -2,16 +2,19 @@
 
 #include "../../protocol/base/include/api_keys.hpp"
 #include "../../protocol/requests/include/kafka_request_variant.hpp"
+#include "../../storage/include/storage_service.hpp"
 #include "socket_fd.hpp"
 #include "thread_pool.hpp"
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <netinet/in.h>
 
 class KafkaServer {
 public:
   explicit KafkaServer(uint16_t port = 9092);
+  KafkaServer(uint16_t port, std::unique_ptr<storage::IStorageService> storage);
   ~KafkaServer() = default;
 
   void start();
@@ -34,4 +37,5 @@ private:
   struct sockaddr_in server_addr;
   ThreadPool thread_pool;
   std::map<int16_t, RequestHandler> apiHandlers;
+  std::unique_ptr<storage::IStorageService> storage_;
 };

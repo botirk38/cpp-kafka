@@ -1,16 +1,11 @@
 #include "include/kafka_server.hpp"
+#include "../common/include/kafka_errors.hpp"
 #include "../protocol/base/include/kafka_request.hpp"
 #include "../protocol/responses/include/api_version_response.hpp"
 #include "../protocol/responses/include/describe_topics_partitions_response.hpp"
 #include "../protocol/responses/include/fetch_response.hpp"
-#include "../storage/include/log_metadata_reader.hpp"
-#include "../storage/include/record_batch_reader.hpp"
+#include "../storage/include/storage_service.hpp"
 #include "include/kafka_parser.hpp"
-#if USE_CPP_MODULES
-import kafka_errors;
-#else
-#include "../common/include/kafka_errors.hpp"
-#endif
 #include <cstring>
 #include <iostream>
 #include <ostream>
@@ -23,7 +18,21 @@ std::ostream &operator<<(std::ostream &os, const uint128_t &value) {
 }
 
 KafkaServer::KafkaServer(uint16_t port)
-    : port(port), thread_pool(std::thread::hardware_concurrency()) {
+    : port(port), thread_pool(std::thread::hardware_concurrency()),
+      storage_(storage::createStorageService("/tmp/kraft-combined-logs")) {
+  server_socket_ = SocketFd::create();
+  server_socket_.setReuseAddr();
+
+  server_addr = {};
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_addr.s_addr = INADDR_ANY;
+  server_addr.sin_port = htons(port);
+
+  registerHandlers();
+}
+
+KafkaServer::KafkaServer(uint16_t port, std::unique_ptr<storage::IStorageService> storage)
+    : port(port), thread_pool(std::thread::hardware_concurrency()), storage_(std::move(storage)) {
   server_socket_ = SocketFd::create();
   server_socket_.setReuseAddr();
 
@@ -122,23 +131,18 @@ void KafkaServer::handleDescribeTopicPartitions(const DescribeTopicsRequest &req
                                                 char *response, int &offset) {
   const auto &header = request.header;
 
-  KafkaLogMetadataReader reader("/tmp/kraft-combined-logs");
-  auto cluster_metadata = reader.loadClusterMetadata();
+  auto snapshot = storage_->loadClusterSnapshot();
+  if (!snapshot) {
+    offset = 0;
+    return;
+  }
 
   DescribeTopicPartitionsResponse writer(response);
-  writer.writeHeader(header.correlation_id, request.topic_names.size());
+  writer.writeHeader(header.correlation_id, static_cast<int8_t>(request.topic_names.size()));
 
   for (const auto &topic_name : request.topic_names) {
-    // Find topic by name in cluster metadata
-    auto topic_it =
-        std::find_if(cluster_metadata.topics_by_id.begin(), cluster_metadata.topics_by_id.end(),
-                     [&topic_name](const auto &pair) { return pair.second.name == topic_name; });
-
-    std::optional<KafkaMetadata::TopicMetadata> topic_metadata =
-        topic_it != cluster_metadata.topics_by_id.end() ? std::make_optional(topic_it->second)
-                                                        : std::nullopt;
-
-    writer.writeTopic(topic_name, topic_metadata);
+    auto topic_info = storage_->findTopicByName(*snapshot, topic_name);
+    writer.writeTopic(topic_name, topic_info);
   }
 
   writer.complete();
@@ -152,31 +156,42 @@ void KafkaServer::handleFetch(const FetchRequest &request, char *response, int &
   FetchResponse writer(response);
   writer.writeHeader(header.correlation_id).writeResponseData(0, 0, 0, topics_size + 1);
 
-  KafkaLogMetadataReader reader("/tmp/kraft-combined-logs");
-  auto cluster_metadata = reader.loadClusterMetadata();
+  auto snapshot = storage_->loadClusterSnapshot();
+  if (!snapshot) {
+    writer.complete();
+    offset = writer.getOffset();
+    return;
+  }
 
   for (const auto &topic : request.topics) {
-    int8_t partition_count = topic.partitions.size();
+    writer.writeTopicHeader(topic.topic_id, static_cast<int64_t>(topic.partitions.size()) + 1);
 
-    writer.writeTopicHeader(topic.topic_id, partition_count + 1);
-
-    auto topic_metadata = cluster_metadata.topics_by_id.find(topic.topic_id);
-    bool topic_exists = topic_metadata != cluster_metadata.topics_by_id.end();
+    auto topic_info = storage_->findTopicById(*snapshot, storage::TopicId{topic.topic_id});
 
     for (const auto &partition : topic.partitions) {
-      if (!topic_exists) {
+      if (!topic_info) {
         writer.writePartitionData(partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
                                   std::vector<FetchResponse::AbortedTransaction>{}, 0,
-                                  std::vector<RecordBatchReader::RecordBatch>{});
+                                  RecordBatches{});
         continue;
       }
 
-      const auto &partition_metadata = topic_metadata->second.partitions[partition.partition];
-      const auto &record_batches = partition_metadata.record_batches;
+      const auto &partitions = topic_info->partitions;
+      if (partition.partition < 0 ||
+          static_cast<size_t>(partition.partition) >= partitions.size()) {
+        writer.writePartitionData(partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
+                                  std::vector<FetchResponse::AbortedTransaction>{}, 0,
+                                  RecordBatches{});
+        continue;
+      }
+
+      const auto &partition_info = partitions[static_cast<size_t>(partition.partition)];
+      auto partition_data =
+          storage_->readPartitionData(topic_info->name, partition_info.partition_id);
+      RecordBatches batches = partition_data ? std::move(*partition_data) : RecordBatches{};
 
       writer.writePartitionData(partition.partition, 0, 0, 0, 0,
-                                std::vector<FetchResponse::AbortedTransaction>{}, 0,
-                                record_batches);
+                                std::vector<FetchResponse::AbortedTransaction>{}, 0, batches);
     }
   }
 

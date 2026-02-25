@@ -1,29 +1,30 @@
-#include "../include/metadata_decoder.hpp"
+#include "metadata/metadata_decoder.hpp"
+#include "storage_error.hpp"
 #include <gtest/gtest.h>
 #include <vector>
 
-using namespace KafkaMetadata;
+using namespace storage::metadata;
 
 TEST(MetadataDecoderTest, TopicRecordTooShort) {
   std::vector<uint8_t> data(2, 0);
-  EXPECT_THROW(decodeTopicRecord(data), DecodeError);
+  EXPECT_THROW(decodeTopicRecord(data), storage::StorageError);
 }
 
 TEST(MetadataDecoderTest, TopicRecordInvalidNameLength) {
   std::vector<uint8_t> data(20, 0);
   data[3] = 0;
-  EXPECT_THROW(decodeTopicRecord(data), DecodeError);
+  EXPECT_THROW(decodeTopicRecord(data), storage::StorageError);
 }
 
 TEST(MetadataDecoderTest, TopicRecordNameExtendsPastBuffer) {
   std::vector<uint8_t> data(10, 0);
   data[3] = 10;
-  EXPECT_THROW(decodeTopicRecord(data), DecodeError);
+  EXPECT_THROW(decodeTopicRecord(data), storage::StorageError);
 }
 
 TEST(MetadataDecoderTest, PartitionRecordTooShort) {
   std::vector<uint8_t> data(2, 0);
-  EXPECT_THROW(decodePartitionRecord(data), DecodeError);
+  EXPECT_THROW(decodePartitionRecord(data), storage::StorageError);
 }
 
 TEST(MetadataDecoderTest, TopicRecordValid) {
@@ -36,5 +37,5 @@ TEST(MetadataDecoderTest, TopicRecordValid) {
 
   auto topic = decodeTopicRecord(data);
   EXPECT_EQ(topic.name, "test");
-  EXPECT_EQ(static_cast<uint64_t>(topic.topic_id), 0u);
+  EXPECT_EQ(static_cast<uint64_t>(topic.topic_id.value), 0u);
 }

@@ -1,11 +1,29 @@
 add_executable(metadata_decoder_tests metadata_decoder_test.cpp)
 target_link_libraries(metadata_decoder_tests PRIVATE GTest::gtest_main kafka_storage)
 target_include_directories(metadata_decoder_tests PRIVATE
-  ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/storage/include
-  ${CMAKE_SOURCE_DIR}/src/protocol/base/include
 )
 kafka_enable_warnings(metadata_decoder_tests)
 kafka_enable_sanitizers(metadata_decoder_tests)
 kafka_enable_coverage(metadata_decoder_tests)
 gtest_discover_tests(metadata_decoder_tests)
+
+add_executable(path_resolver_tests path_resolver_test.cpp)
+target_link_libraries(path_resolver_tests PRIVATE GTest::gtest_main kafka_storage)
+target_include_directories(path_resolver_tests PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/storage/include
+)
+kafka_enable_warnings(path_resolver_tests)
+kafka_enable_sanitizers(path_resolver_tests)
+kafka_enable_coverage(path_resolver_tests)
+gtest_discover_tests(path_resolver_tests)
+
+add_executable(storage_service_tests storage_service_test.cpp)
+target_link_libraries(storage_service_tests PRIVATE GTest::gtest_main kafka_storage)
+target_include_directories(storage_service_tests PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/storage/include
+)
+kafka_enable_warnings(storage_service_tests)
+kafka_enable_sanitizers(storage_service_tests)
+kafka_enable_coverage(storage_service_tests)
+gtest_discover_tests(storage_service_tests)

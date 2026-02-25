@@ -6,7 +6,7 @@ target_include_directories(kafka_protocol_base INTERFACE
 target_link_libraries(kafka_protocol_base INTERFACE kafka_common)
 kafka_enable_warnings(kafka_protocol_base)
 
-# Storage must be built before protocol responses (responses depend on RecordBatchReader)
+# Storage must be built before protocol responses (responses depend on storage types)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../storage ${CMAKE_BINARY_DIR}/storage)
 
 # Protocol responses (has .cpp files)
