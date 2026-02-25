@@ -24,23 +24,22 @@ public:
 
   RecordReader &readAttributes() { return readRaw(record.attributes); }
 
-  RecordReader &readTimestampDelta() {
-    return readVarint(record.timestamp_delta);
-  }
+  RecordReader &readTimestampDelta() { return readVarint(record.timestamp_delta); }
 
   RecordReader &readOffsetDelta() { return readVarint(record.offset_delta); }
 
   RecordReader &readKeyValue() {
+    constexpr size_t MAX_FIELD_SIZE = 1024 * 1024; // 1MB sanity limit
     int32_t key_length;
     readZigZagVarint(key_length);
-    if (key_length >= 0) {
+    if (key_length >= 0 && static_cast<size_t>(key_length) <= MAX_FIELD_SIZE) {
       record.key.resize(key_length);
       readBytes(record.key, key_length);
     }
 
     int32_t value_length;
     readZigZagVarint(value_length);
-    if (value_length >= 0) {
+    if (value_length >= 0 && static_cast<size_t>(value_length) <= MAX_FIELD_SIZE) {
       record.value.resize(value_length);
       readBytes(record.value, value_length);
     }
@@ -48,23 +47,28 @@ public:
   }
 
   RecordReader &readHeaders() {
+    constexpr int32_t MAX_HEADERS = 64;
+    constexpr size_t MAX_HEADER_FIELD = 64 * 1024;
     int32_t headers_count;
     readVarint(headers_count);
+    if (headers_count < 0 || headers_count > MAX_HEADERS) {
+      return *this;
+    }
 
     for (int i = 0; i < headers_count; i++) {
       Header header;
 
-      // Read header key
       int32_t key_length;
       readVarint(key_length);
-      std::vector<char> key_chars(key_length);
-      readBytes(reinterpret_cast<uint8_t *>(key_chars.data()), key_length);
-      header.key = std::string(key_chars.begin(), key_chars.end());
+      if (key_length >= 0 && static_cast<size_t>(key_length) <= MAX_HEADER_FIELD) {
+        std::vector<char> key_chars(key_length);
+        readBytes(reinterpret_cast<uint8_t *>(key_chars.data()), key_length);
+        header.key = std::string(key_chars.begin(), key_chars.end());
+      }
 
-      // Read header value
       int32_t value_length;
       readVarint(value_length);
-      if (value_length >= 0) {
+      if (value_length >= 0 && static_cast<size_t>(value_length) <= MAX_HEADER_FIELD) {
         header.value.resize(value_length);
         readBytes(header.value, value_length);
       }
@@ -120,8 +124,7 @@ public:
     file.seekg(start_pos);
 
     batch.raw_data.resize(batch.batch_length + 12); // Include header size
-    file.read(reinterpret_cast<char *>(batch.raw_data.data()),
-              batch.batch_length + 12);
+    file.read(reinterpret_cast<char *>(batch.raw_data.data()), batch.batch_length + 12);
 
     // Restore position
     file.seekg(current_pos);

@@ -1,15 +1,9 @@
 #include "include/kafka_parser.hpp"
-#include "../protocol/responses/include/api_version_response.hpp"
-#include "../protocol/responses/include/describe_topics_partitions_response.hpp"
-#include "../protocol/responses/include/fetch_response.hpp"
 #include <arpa/inet.h>
 
-using ApiVersion = ApiVersionResponse::ApiVersions;
-using DescribeTopics = DescribeTopicPartitionsResponse::DescribeTopicPartitions;
-using Fetch = FetchResponse::Fetch;
+namespace KP = KafkaProtocol;
 
-Parser::Buffer::Buffer(const uint8_t *data, size_t length)
-    : data(data), length(length) {}
+Parser::Buffer::Buffer(const uint8_t *data, size_t length) : data(data), length(length) {}
 
 void Parser::Buffer::advance(size_t n) {
   if (n > remaining()) {
@@ -76,8 +70,7 @@ std::string Parser::Buffer::readCompactString() {
   return result;
 }
 
-std::unique_ptr<KafkaRequest> Parser::parse(const uint8_t *data,
-                                            size_t length) {
+KafkaRequestVariant Parser::parse(const uint8_t *data, size_t length) {
   Buffer buffer(data, length);
   if (length < 12) {
     throw ParseError("Message too short");
@@ -85,11 +78,11 @@ std::unique_ptr<KafkaRequest> Parser::parse(const uint8_t *data,
 
   auto header = parseHeader(buffer);
   switch (header.api_key) {
-  case ApiVersion::KEY:
+  case KP::API_VERSIONS:
     return parseApiVersion(buffer, std::move(header));
-  case DescribeTopics::KEY:
+  case KP::DESCRIBE_TOPIC_PARTITIONS:
     return parseDescribeTopics(buffer, std::move(header));
-  case Fetch::KEY:
+  case KP::FETCH:
     return parseFetch(buffer, std::move(header));
   default:
     throw ParseError("Unknown API key: " + std::to_string(header.api_key));
@@ -107,63 +100,67 @@ RequestHeader Parser::parseHeader(Buffer &buffer) {
   return header;
 }
 
-std::unique_ptr<ApiVersionRequest>
-Parser::parseApiVersion(Buffer &buffer, RequestHeader header) {
-  auto request = std::make_unique<ApiVersionRequest>();
-  request->header = std::move(header);
+ApiVersionRequest Parser::parseApiVersion(Buffer &buffer, RequestHeader header) {
+  ApiVersionRequest request;
+  request.header = std::move(header);
   return request;
 }
 
-std::unique_ptr<DescribeTopicsRequest>
-Parser::parseDescribeTopics(Buffer &buffer, RequestHeader header) {
-  auto request = std::make_unique<DescribeTopicsRequest>();
-  request->header = std::move(header);
-
+DescribeTopicsRequest Parser::parseDescribeTopics(Buffer &buffer, RequestHeader header) {
+  DescribeTopicsRequest request;
+  request.header = std::move(header);
 
   buffer.skip(1); // TAG_BUFFER
-  auto topics_length = buffer.readInt8() - 1;
+  int topics_length = buffer.readInt8() - 1;
+  if (topics_length < 0 || static_cast<size_t>(topics_length) > buffer.remaining()) {
+    throw ParseError("Invalid topics array length");
+  }
 
   for (int i = 0; i < topics_length; i++) {
     auto topic_name = buffer.readCompactString();
     buffer.skip(1); // TAG_BUFFER for topic
-    request->topic_names.push_back(std::move(topic_name));
+    request.topic_names.push_back(std::move(topic_name));
   }
 
-  request->response_partition_limit = buffer.readInt32();
+  request.response_partition_limit = buffer.readInt32();
 
   auto cursor_tag = buffer.readUInt8();
   if (cursor_tag != 0xFF) {
     DescribeTopicsRequest::Cursor cursor;
     cursor.topic_name = buffer.readCompactString();
     cursor.partition_index = buffer.readInt32();
-    request->cursor = cursor;
+    request.cursor = cursor;
   }
 
   buffer.skip(1); // Final TAG_BUFFER
   return request;
 }
 
-std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
-                                                 RequestHeader header) {
-  auto request = std::make_unique<FetchRequest>();
-  request->header = header;
+FetchRequest Parser::parseFetch(Buffer &buffer, RequestHeader header) {
+  FetchRequest request;
+  request.header = header;
   buffer.skip(1);
 
-  request->max_wait_ms = buffer.readInt32();
-  request->min_bytes = buffer.readInt32();
-  request->max_bytes = buffer.readInt32();
-  request->isolation_level = buffer.readInt8();
-  request->session_id = buffer.readInt32();
-  request->session_epoch = buffer.readInt32();
+  request.max_wait_ms = buffer.readInt32();
+  request.min_bytes = buffer.readInt32();
+  request.max_bytes = buffer.readInt32();
+  request.isolation_level = buffer.readInt8();
+  request.session_id = buffer.readInt32();
+  request.session_epoch = buffer.readInt32();
 
-  // Read topics array
   int topics_length = buffer.readInt8() - 1;
+  if (topics_length < 0 || static_cast<size_t>(topics_length) > buffer.remaining()) {
+    throw ParseError("Invalid fetch topics array length");
+  }
 
   for (int i = 0; i < topics_length; i++) {
     FetchTopic topic;
     topic.topic_id = buffer.readUint128();
 
     int partitions_length = buffer.readInt8() - 1;
+    if (partitions_length < 0 || static_cast<size_t>(partitions_length) > buffer.remaining()) {
+      throw ParseError("Invalid fetch partitions array length");
+    }
 
     for (int j = 0; j < partitions_length; j++) {
       FetchPartition partition;
@@ -176,11 +173,14 @@ std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
       topic.partitions.push_back(partition);
     }
 
-    request->topics.push_back(topic);
+    request.topics.push_back(topic);
   }
 
-  // Read forgotten topics
   int8_t forgotten_topics_length = buffer.readInt8() - 1;
+  if (forgotten_topics_length < 0 ||
+      static_cast<size_t>(forgotten_topics_length) > buffer.remaining()) {
+    throw ParseError("Invalid forgotten topics array length");
+  }
 
   for (int8_t i = 0; i < forgotten_topics_length; i++) {
     ForgottenTopic topic;
@@ -191,10 +191,10 @@ std::unique_ptr<FetchRequest> Parser::parseFetch(Buffer &buffer,
     for (int j = 0; j < partitions_length; j++) {
       topic.partitions.push_back(buffer.readInt32());
     }
-    request->forgotten_topics_data.push_back(topic);
+    request.forgotten_topics_data.push_back(topic);
   }
 
-  request->rack_id = buffer.readCompactString();
+  request.rack_id = buffer.readCompactString();
 
   return request;
 }

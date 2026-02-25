@@ -22,8 +22,7 @@ protected:
   ByteReader(std::ifstream &file) : file(file) {}
 
   template <typename T> Derived &readRaw(T &value) {
-    static_assert(std::is_trivially_copyable_v<T>,
-                  "Type must be trivially copyable");
+    static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
     file.read(reinterpret_cast<char *>(&value), sizeof(T));
     return *static_cast<Derived *>(this);
   }

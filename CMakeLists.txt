@@ -1,53 +1,41 @@
-cmake_minimum_required(VERSION 3.13)
-project(codecrafters-kafka)
+cmake_minimum_required(VERSION 3.28)
+project(cpp-kafka LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+option(ENABLE_CPP_MODULES "Use C++20 modules (requires Ninja)" OFF)
 
-# Add spdlog
-find_package(spdlog QUIET)
-if(NOT spdlog_FOUND)
-    message(STATUS "spdlog not found via find_package, using system includes")
-    set(SPDLOG_INCLUDE_DIRS "/usr/include")
+if(ENABLE_CPP_MODULES AND NOT CMAKE_GENERATOR MATCHES "Ninja")
+  message(FATAL_ERROR "ENABLE_CPP_MODULES=ON requires Ninja. Use: cmake -G Ninja -B build -S . -DENABLE_CPP_MODULES=ON")
 endif()
 
-# Collect source files from new structure
-file(GLOB_RECURSE SOURCE_FILES
-    src/main.cpp
-    src/core/*.cpp
-    src/protocol/**/*.cpp
-    src/storage/*.cpp
+enable_testing()
+
+include(ProjectOptions)
+include(CompilerWarnings)
+include(Sanitizers)
+include(Coverage)
+include(Dependencies)
+
+add_subdirectory(src/common)
+add_subdirectory(src/protocol)  # protocol adds storage as subdirectory
+add_subdirectory(src/core)
+
+add_executable(kafka src/main.cpp)
+target_link_libraries(kafka PRIVATE kafka_core)
+kafka_enable_warnings(kafka)
+kafka_enable_sanitizers(kafka)
+kafka_enable_coverage(kafka)
+
+# Tests
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG v1.14.0
 )
-
-# Collect header files for IDE support
-file(GLOB_RECURSE HEADER_FILES
-    src/core/include/*.hpp
-    src/protocol/**/include/*.hpp
-    src/storage/include/*.hpp
-    src/common/include/*.hpp
-)
-
-add_executable(kafka ${SOURCE_FILES} ${HEADER_FILES})
-
-# Add include directories for each package
-target_include_directories(kafka PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol/base/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol/requests/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/protocol/responses/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/storage/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/common/include
-)
-
-if(spdlog_FOUND)
-    target_link_libraries(kafka PRIVATE
-        spdlog::spdlog
-        $<$<BOOL:${MINGW}>:ws2_32>
-    )
-else()
-    target_link_libraries(kafka PRIVATE
-        $<$<BOOL:${MINGW}>:ws2_32>
-    )
-endif()
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+include(GoogleTest)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/core/tests ${CMAKE_BINARY_DIR}/core-tests)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/protocol/tests ${CMAKE_BINARY_DIR}/protocol-tests)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/storage/tests ${CMAKE_BINARY_DIR}/storage-tests)

@@ -25,6 +25,10 @@ ThreadPool::~ThreadPool() {
     stop = true;
   }
   condition.notify_all();
+  for (auto &w : workers) {
+    if (w.joinable())
+      w.join();
+  }
 }
 
 void ThreadPool::enqueue(std::function<void()> task) {

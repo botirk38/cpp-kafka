@@ -1,0 +1,17 @@
+# Sanitizers.cmake - Address/Undefined/Thread sanitizer support
+include_guard(GLOBAL)
+
+function(kafka_enable_sanitizers target)
+  if(ENABLE_ASAN)
+    target_compile_options(${target} PRIVATE -fsanitize=address)
+    target_link_options(${target} PRIVATE -fsanitize=address)
+  endif()
+  if(ENABLE_UBSAN)
+    target_compile_options(${target} PRIVATE -fsanitize=undefined)
+    target_link_options(${target} PRIVATE -fsanitize=undefined)
+  endif()
+  if(ENABLE_TSAN)
+    target_compile_options(${target} PRIVATE -fsanitize=thread)
+    target_link_options(${target} PRIVATE -fsanitize=thread)
+  endif()
+endfunction()

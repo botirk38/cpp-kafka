@@ -12,10 +12,5 @@ public:
   ApiVersionResponse &writeMetadata();
   ApiVersionResponse &complete();
 
-  enum ApiVersions {
-    KEY = 18,
-    MIN_VERSION = 0,
-    MAX_VERSION = 4,
-    UNSUPPORTED_VERSION = 35
-  };
+  enum ApiVersions { KEY = 18, MIN_VERSION = 0, MAX_VERSION = 4, UNSUPPORTED_VERSION = 35 };
 };

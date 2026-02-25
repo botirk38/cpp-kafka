@@ -5,8 +5,7 @@
 #include <optional>
 
 DescribeTopicPartitionsResponse &
-DescribeTopicPartitionsResponse::writeHeader(int32_t correlation_id,
-                                             int8_t topics_length) {
+DescribeTopicPartitionsResponse::writeHeader(int32_t correlation_id, int8_t topics_length) {
   skipBytes(4) // Message size placeholder
       .writeInt32(correlation_id)
       .writeInt8(0)                  // Tag buffer
@@ -20,8 +19,7 @@ DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
     const std::optional<KafkaMetadata::TopicMetadata> &topic_metadata) {
 
   if (topic_metadata) {
-    writeTopicMetadata(topic_name, topic_metadata->topic_id,
-                       topic_metadata->partitions);
+    writeTopicMetadata(topic_name, topic_metadata->topic_id, topic_metadata->partitions);
   } else {
     writeUnknownTopicError(topic_name);
   }
@@ -29,8 +27,7 @@ DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopic(
   return *this;
 }
 
-DescribeTopicPartitionsResponse &
-DescribeTopicPartitionsResponse::writeTopicMetadata(
+DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::writeTopicMetadata(
     const std::string &topic_name, const uint128_t topic_id,
     const std::vector<KafkaMetadata::PartitionMetadata> &partition_metadata) {
   const int8_t num_partitions = partition_metadata.size();
@@ -70,16 +67,15 @@ DescribeTopicPartitionsResponse::writePartitionMetadata(int32_t partition_id) {
 }
 
 DescribeTopicPartitionsResponse &
-DescribeTopicPartitionsResponse::writeUnknownTopicError(
-    const std::string &topic_name) {
+DescribeTopicPartitionsResponse::writeUnknownTopicError(const std::string &topic_name) {
   writeInt16(ERROR_UNKNOWN_TOPIC)         // error code for unknown topic
       .writeInt8(topic_name.length() + 1) // Compact string length
       .writeCompactString(topic_name)
       .writeBytes(std::array<uint8_t, 16>{}.data(), 16) // Empty UUID
       .writeInt8(0)                                     // is_internal
-      .writeInt8(1)  // partitions array length (empty array = 1)
-      .writeInt32(0) // topic_authorized_operations
-      .writeInt8(0); // Tag buffer
+      .writeInt8(1)                                     // partitions array length (empty array = 1)
+      .writeInt32(0)                                    // topic_authorized_operations
+      .writeInt8(0);                                    // Tag buffer
 
   return *this;
 }

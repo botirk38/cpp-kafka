@@ -1,13 +1,13 @@
 #pragma once
 
+#include "../../protocol/base/include/api_keys.hpp"
+#include "../../protocol/base/include/kafka_request.hpp"
 #include "../../protocol/requests/include/api_version_request.hpp"
 #include "../../protocol/requests/include/describe_topic_partitions_request.hpp"
 #include "../../protocol/requests/include/fetch_request.hpp"
-#include "../../protocol/responses/include/fetch_response.hpp"
-#include "../../protocol/base/include/kafka_request.hpp"
+#include "../../protocol/requests/include/kafka_request_variant.hpp"
 #include <cstdint>
 #include <cstring>
-#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -17,8 +17,7 @@ class ParseError : public std::runtime_error {
 
 class Parser {
 public:
-  static std::unique_ptr<KafkaRequest> parse(const uint8_t *data,
-                                             size_t length);
+  static KafkaRequestVariant parse(const uint8_t *data, size_t length);
 
 private:
   class Buffer {
@@ -61,10 +60,7 @@ private:
   };
 
   static RequestHeader parseHeader(Buffer &buffer);
-  static std::unique_ptr<ApiVersionRequest>
-  parseApiVersion(Buffer &buffer, RequestHeader header);
-  static std::unique_ptr<DescribeTopicsRequest>
-  parseDescribeTopics(Buffer &buffer, RequestHeader header);
-  static std::unique_ptr<FetchRequest> parseFetch(Buffer &buffer,
-                                                  RequestHeader header);
+  static ApiVersionRequest parseApiVersion(Buffer &buffer, RequestHeader header);
+  static DescribeTopicsRequest parseDescribeTopics(Buffer &buffer, RequestHeader header);
+  static FetchRequest parseFetch(Buffer &buffer, RequestHeader header);
 };

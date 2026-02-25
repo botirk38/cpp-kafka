@@ -1,9 +1,9 @@
 #pragma once
 
 #include "record_batch_reader.hpp"
-#include "vector"
 #include <map>
 #include <string>
+#include <vector>
 
 using uint128_t = __uint128_t;
 

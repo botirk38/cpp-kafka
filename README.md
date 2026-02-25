@@ -2,7 +2,7 @@
 # cpp-kafka
 
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
-[![CMake](https://img.shields.io/badge/CMake-3.13+-064F8C.svg)](https://cmake.org/)
+[![CMake](https://img.shields.io/badge/CMake-3.28+-064F8C.svg)](https://cmake.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 A lightweight, high-performance Kafka server implementation in modern C++23.
@@ -23,8 +23,8 @@ cpp-kafka is a Kafka-compatible server that implements core Kafka protocol opera
 
 ### Prerequisites
 
-- **C++ Compiler**: GCC 14+ or Clang 16+ (with C++23 support)
-- **CMake**: Version 3.13 or higher
+- **C++ Compiler**: GCC 13+ or Clang 15+ (with C++23 support)
+- **CMake**: 3.28+
 - **spdlog**: Optional, for logging support
 
 ### Installation
@@ -72,13 +72,16 @@ The project follows a clean, layered architecture:
 src/
 ├── core/                    # Server and connection handling
 │   ├── include/             # Public headers
+│   ├── tests/               # Core module tests
 │   └── *.cpp                # Implementation
 ├── protocol/                # Kafka protocol implementation
 │   ├── base/include/        # Base classes (MessageWriter, ByteReader)
 │   ├── requests/include/    # Request types
-│   └── responses/           # Response types and implementations
+│   ├── responses/           # Response types and implementations
+│   └── tests/               # Protocol module tests
 ├── storage/                 # Data persistence
 │   ├── include/             # Storage headers
+│   ├── tests/               # Storage module tests
 │   └── *.cpp                # Storage implementation
 └── common/include/          # Shared utilities
 ```
@@ -111,9 +114,20 @@ rm -rf build
 cmake -B build -S .
 cmake --build ./build
 
-# Run tests (if available)
+# Run tests
+ctest --test-dir build --output-on-failure
+
+# Run server
 ./build/kafka
 ```
+
+### Build Options
+
+- `-DENABLE_COVERAGE=ON` - Enable coverage instrumentation
+- `-DENABLE_ASAN=ON` - Enable AddressSanitizer
+- `-DENABLE_UBSAN=ON` - Enable UndefinedBehaviorSanitizer
+- `-DUSE_CPP26=ON` - Use C++26 (requires GCC 14+ / Clang 18+)
+- `-DENABLE_CPP_MODULES=ON` - Use C++20 modules (requires Ninja: `cmake -G Ninja -B build -S . -DENABLE_CPP_MODULES=ON`)
 
 ### Project Guidelines
 
@@ -131,12 +145,9 @@ cmake --build ./build
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code standards, and PR guidelines.
 
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
-
-Built as part of the CodeCrafters Kafka challenge.

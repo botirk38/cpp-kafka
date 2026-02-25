@@ -1,21 +1,21 @@
 #include "include/kafka_server.hpp"
-#include "include/kafka_parser.hpp"
+#include "../protocol/base/include/kafka_request.hpp"
 #include "../protocol/responses/include/api_version_response.hpp"
 #include "../protocol/responses/include/describe_topics_partitions_response.hpp"
 #include "../protocol/responses/include/fetch_response.hpp"
-#include "../protocol/base/include/kafka_request.hpp"
 #include "../storage/include/log_metadata_reader.hpp"
 #include "../storage/include/record_batch_reader.hpp"
+#include "include/kafka_parser.hpp"
+#if USE_CPP_MODULES
+import kafka_errors;
+#else
 #include "../common/include/kafka_errors.hpp"
+#endif
 #include <cstring>
-#include <errno.h>
-#include <fcntl.h>
 #include <iostream>
 #include <ostream>
 #include <string>
 #include <sys/socket.h>
-#include <system_error>
-#include <unistd.h>
 
 std::ostream &operator<<(std::ostream &os, const uint128_t &value) {
   return os << std::hex << "0x" << static_cast<uint64_t>(value >> 64)
@@ -24,20 +24,8 @@ std::ostream &operator<<(std::ostream &os, const uint128_t &value) {
 
 KafkaServer::KafkaServer(uint16_t port)
     : port(port), thread_pool(std::thread::hardware_concurrency()) {
-
-  server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (server_fd < 0) {
-    throw std::system_error(errno, std::generic_category(),
-                            "Failed to create socket");
-  }
-
-  int reuse = 1;
-  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) <
-      0) {
-    close(server_fd);
-    throw std::system_error(errno, std::generic_category(),
-                            "Failed to set socket options");
-  }
+  server_socket_ = SocketFd::create();
+  server_socket_.setReuseAddr();
 
   server_addr = {};
   server_addr.sin_family = AF_INET;
@@ -48,94 +36,64 @@ KafkaServer::KafkaServer(uint16_t port)
 }
 
 void KafkaServer::registerHandlers() {
-  apiHandlers[ApiVersionResponse::ApiVersions::KEY] =
-      [this](const KafkaRequest &request, char *response, int &offset) {
-        handleApiVersions(request, response, offset);
-      };
+  namespace KP = KafkaProtocol;
+  apiHandlers[KP::API_VERSIONS] = [this](const KafkaRequestVariant &v, char *response,
+                                         int &offset) {
+    handleApiVersions(std::get<ApiVersionRequest>(v), response, offset);
+  };
 
-  apiHandlers[DescribeTopicPartitionsResponse::DescribeTopicPartitions::KEY] =
-      [this](const KafkaRequest &request, char *response, int &offset) {
-        handleDescribeTopicPartitions(request, response, offset);
-      };
+  apiHandlers[KP::DESCRIBE_TOPIC_PARTITIONS] = [this](const KafkaRequestVariant &v, char *response,
+                                                      int &offset) {
+    handleDescribeTopicPartitions(std::get<DescribeTopicsRequest>(v), response, offset);
+  };
 
-  apiHandlers[FetchResponse::Fetch::KEY] = [this](const KafkaRequest &request,
-                                                  char *response, int &offset) {
-    handleFetch(request, response, offset);
+  apiHandlers[KP::FETCH] = [this](const KafkaRequestVariant &v, char *response, int &offset) {
+    handleFetch(std::get<FetchRequest>(v), response, offset);
   };
 }
 
-KafkaServer::~KafkaServer() {
-  if (server_fd >= 0) {
-    close(server_fd);
-  }
-}
-
 void KafkaServer::start() {
-  if (bind(server_fd, reinterpret_cast<struct sockaddr *>(&server_addr),
-           sizeof(server_addr)) != 0) {
-    throw std::system_error(errno, std::generic_category(), "Failed to bind");
-  }
-
-  if (listen(server_fd, 5) != 0) {
-    throw std::system_error(errno, std::generic_category(), "Failed to listen");
-  }
-
+  server_socket_.bind(server_addr);
+  server_socket_.listen(5);
 
   while (true) {
     struct sockaddr_in client_addr{};
     socklen_t client_addr_len = sizeof(client_addr);
 
-    int client_fd =
-        accept(server_fd, reinterpret_cast<struct sockaddr *>(&client_addr),
-               &client_addr_len);
+    SocketFd client = server_socket_.accept(client_addr, client_addr_len);
 
-    if (client_fd < 0) {
+    if (!client.valid()) {
       std::cerr << "Accept failed" << std::endl;
       continue;
     }
 
+    int client_fd = client.release();
     thread_pool.enqueue([this, client_fd] { handleClient(client_fd); });
   }
 }
 
 void KafkaServer::handleClient(int client_fd) {
+  SocketFd client(client_fd);
   std::vector<uint8_t> buffer(BUFFER_SIZE);
   char response[BUFFER_SIZE];
 
-  // Set socket to non-blocking mode
-  int flags = fcntl(client_fd, F_GETFL, 0);
-  fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+  client.setSendTimeout(5);
 
   while (true) {
-    ssize_t bytes_received =
-        recv(client_fd, buffer.data(), buffer.size(), MSG_DONTWAIT);
-    if (bytes_received < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        // No data available, continue polling
-        continue;
-      }
-      break;
-    }
-    if (bytes_received == 0) {
+    ssize_t bytes_received = recv(client.get(), buffer.data(), buffer.size(), 0);
+    if (bytes_received <= 0) {
       break;
     }
 
     try {
       int offset = 0;
       auto request = Parser::parse(buffer.data(), bytes_received);
-      auto handler = apiHandlers.find(request->header.api_key);
+      auto handler = apiHandlers.find(getApiKey(request));
 
       if (handler != apiHandlers.end()) {
-        handler->second(*request, response, offset);
+        handler->second(request, response, offset);
 
-        // Send response with timeout
-        struct timeval tv;
-        tv.tv_sec = 5;
-        tv.tv_usec = 0;
-        setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
-        ssize_t bytes_wrote = send(client_fd, response, offset, 0);
-        if (bytes_wrote < 0) {
+        if (send(client.get(), response, offset, 0) < 0) {
           break;
         }
       }
@@ -144,12 +102,9 @@ void KafkaServer::handleClient(int client_fd) {
       break;
     }
   }
-
-  close(client_fd);
 }
 
-void KafkaServer::handleApiVersions(const KafkaRequest &request, char *response,
-                                    int &offset) {
+void KafkaServer::handleApiVersions(const ApiVersionRequest &request, char *response, int &offset) {
   const auto &header = request.header;
 
   ApiVersionResponse writer(response);
@@ -163,31 +118,25 @@ void KafkaServer::handleApiVersions(const KafkaRequest &request, char *response,
   offset = writer.getOffset();
 }
 
-void KafkaServer::handleDescribeTopicPartitions(const KafkaRequest &request,
+void KafkaServer::handleDescribeTopicPartitions(const DescribeTopicsRequest &request,
                                                 char *response, int &offset) {
   const auto &header = request.header;
-  const auto &describe_request =
-      dynamic_cast<const DescribeTopicsRequest &>(request);
 
   KafkaLogMetadataReader reader("/tmp/kraft-combined-logs");
   auto cluster_metadata = reader.loadClusterMetadata();
 
   DescribeTopicPartitionsResponse writer(response);
-  writer.writeHeader(header.correlation_id,
-                     describe_request.topic_names.size());
+  writer.writeHeader(header.correlation_id, request.topic_names.size());
 
-  for (const auto &topic_name : describe_request.topic_names) {
+  for (const auto &topic_name : request.topic_names) {
     // Find topic by name in cluster metadata
-    auto topic_it = std::find_if(cluster_metadata.topics_by_id.begin(),
-                                 cluster_metadata.topics_by_id.end(),
-                                 [&topic_name](const auto &pair) {
-                                   return pair.second.name == topic_name;
-                                 });
+    auto topic_it =
+        std::find_if(cluster_metadata.topics_by_id.begin(), cluster_metadata.topics_by_id.end(),
+                     [&topic_name](const auto &pair) { return pair.second.name == topic_name; });
 
     std::optional<KafkaMetadata::TopicMetadata> topic_metadata =
-        topic_it != cluster_metadata.topics_by_id.end()
-            ? std::make_optional(topic_it->second)
-            : std::nullopt;
+        topic_it != cluster_metadata.topics_by_id.end() ? std::make_optional(topic_it->second)
+                                                        : std::nullopt;
 
     writer.writeTopic(topic_name, topic_metadata);
   }
@@ -196,24 +145,17 @@ void KafkaServer::handleDescribeTopicPartitions(const KafkaRequest &request,
   offset = writer.getOffset();
 }
 
-void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
-                              int &offset) {
+void KafkaServer::handleFetch(const FetchRequest &request, char *response, int &offset) {
   const auto &header = request.header;
-  const auto &fetch_request = dynamic_cast<const FetchRequest &>(request);
-  int8_t topics_size = fetch_request.topics.size();
-
-  
+  int8_t topics_size = static_cast<int8_t>(request.topics.size());
 
   FetchResponse writer(response);
-  writer.writeHeader(header.correlation_id)
-      .writeResponseData(0, 0, 0, topics_size + 1);
+  writer.writeHeader(header.correlation_id).writeResponseData(0, 0, 0, topics_size + 1);
 
- 
   KafkaLogMetadataReader reader("/tmp/kraft-combined-logs");
   auto cluster_metadata = reader.loadClusterMetadata();
 
-
-  for (const auto &topic : fetch_request.topics) {
+  for (const auto &topic : request.topics) {
     int8_t partition_count = topic.partitions.size();
 
     writer.writeTopicHeader(topic.topic_id, partition_count + 1);
@@ -221,26 +163,20 @@ void KafkaServer::handleFetch(const KafkaRequest &request, char *response,
     auto topic_metadata = cluster_metadata.topics_by_id.find(topic.topic_id);
     bool topic_exists = topic_metadata != cluster_metadata.topics_by_id.end();
 
-
-
     for (const auto &partition : topic.partitions) {
-
       if (!topic_exists) {
-        writer.writePartitionData(
-            partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
-            std::vector<FetchResponse::AbortedTransaction>{}, 0,
-            std::vector<RecordBatchReader::RecordBatch>{});
+        writer.writePartitionData(partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
+                                  std::vector<FetchResponse::AbortedTransaction>{}, 0,
+                                  std::vector<RecordBatchReader::RecordBatch>{});
         continue;
       }
 
-      const auto &partition_metadata =
-          topic_metadata->second.partitions[partition.partition];
+      const auto &partition_metadata = topic_metadata->second.partitions[partition.partition];
       const auto &record_batches = partition_metadata.record_batches;
 
-      writer.writePartitionData(
-          partition.partition, 0, 0, 0, 0,
-          std::vector<FetchResponse::AbortedTransaction>{}, 0, record_batches);
-
+      writer.writePartitionData(partition.partition, 0, 0, 0, 0,
+                                std::vector<FetchResponse::AbortedTransaction>{}, 0,
+                                record_batches);
     }
   }
 

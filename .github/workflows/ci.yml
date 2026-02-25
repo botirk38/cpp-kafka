@@ -2,71 +2,103 @@ name: CI
 
 on:
   push:
-    branches: [ master, main, develop ]
+    branches: [master, main, develop]
   pull_request:
-    branches: [ master, main, develop ]
+    branches: [master, main, develop]
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            compiler: gcc
-            version: 13
-          - os: macos-latest
-            compiler: clang
-            version: 15
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install dependencies (Ubuntu)
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake g++-13 libspdlog-dev
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+      - name: Install deps (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-13 libspdlog-dev wget
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          wget -qO- https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.tar.gz | sudo tar xz -C /usr/local --strip-components=1
 
-    - name: Install dependencies (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        brew install cmake spdlog
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake spdlog
 
-    - name: Configure CMake
-      run: |
-        cmake -B build -S . \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_CXX_STANDARD=23
-
-    - name: Build
-      run: cmake --build build --config Release
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: kafka-binary-${{ matrix.os }}
-        path: build/kafka
-        retention-days: 7
+      - name: Build and test
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          ctest --test-dir build --output-on-failure
 
   lint:
-    name: Code Quality Checks
+    name: Format
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang-format-15
+      - run: find src -name '*.cpp' -o -name '*.hpp' | xargs clang-format-15 --dry-run --Werror
 
-    - name: Install clang-format
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang-format-15
+  sanitizers:
+    name: ASan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-13 libspdlog-dev wget
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          wget -qO- https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.tar.gz | sudo tar xz -C /usr/local --strip-components=1
+      - name: Build and test
+        run: |
+          cmake -B build -S . -DENABLE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+          ctest --test-dir build --output-on-failure
 
-    - name: Check formatting
-      run: |
-        find src -name '*.cpp' -o -name '*.hpp' | xargs clang-format-15 --dry-run --Werror || true
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-13 libspdlog-dev wget lcov
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          wget -qO- https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.tar.gz | sudo tar xz -C /usr/local --strip-components=1
+      - name: Build and test
+        run: |
+          cmake -B build -S . -DENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+      - name: Generate coverage
+        run: |
+          lcov --capture --directory build --output-file build/coverage.info --rc lcov_branch_coverage=1
+          lcov --remove build/coverage.info '/usr/*' '*/_deps/*' --output-file build/coverage.info
+
+  build-modules:
+    name: C++ modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build g++-13 libspdlog-dev wget
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          wget -qO- https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-linux-x86_64.tar.gz | sudo tar xz -C /usr/local --strip-components=1
+      - name: Build and test
+        run: |
+          cmake -G Ninja -B build -S . -DENABLE_CPP_MODULES=ON
+          cmake --build build
+          ctest --test-dir build --output-on-failure

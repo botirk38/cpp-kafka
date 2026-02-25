@@ -1,5 +1,6 @@
 #pragma once
 
+#include "api_keys.hpp"
 #include "fetch_response.hpp"
 #include "kafka_request.hpp"
 #include <vector>
@@ -25,7 +26,7 @@ struct ForgottenTopic {
 
 class FetchRequest : public KafkaRequest {
 public:
-  static constexpr int16_t KEY = 1; // Fetch API key
+  static constexpr int16_t KEY = KafkaProtocol::FETCH;
 
   int32_t max_wait_ms;
   int32_t min_bytes;

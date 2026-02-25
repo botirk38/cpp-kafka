@@ -28,18 +28,27 @@ The codebase follows a modular, layered architecture with clear separation betwe
 src/
 ├── core/                    # Core server components
 │   ├── include/*.hpp        # Public headers
+│   ├── tests/               # Core module tests
 │   └── *.cpp                # Implementation files
 ├── protocol/                # Protocol layer
 │   ├── base/include/        # Base classes (MessageWriter, ByteReader, KafkaRequest)
 │   ├── requests/include/    # Request type headers
-│   └── responses/           # Response implementations
-│       ├── include/*.hpp    # Response headers
-│       └── *.cpp            # Response implementations
+│   ├── responses/           # Response implementations
+│   │   ├── include/*.hpp    # Response headers
+│   │   └── *.cpp            # Response implementations
+│   └── tests/               # Protocol module tests
 ├── storage/                 # Storage layer
 │   ├── include/*.hpp        # Storage headers
+│   ├── tests/               # Storage module tests
 │   └── *.cpp                # Storage implementations
 ├── common/include/          # Common utilities (errors, metadata)
 └── main.cpp
+```
+
+### Running Tests
+
+```bash
+ctest --test-dir build --output-on-failure
 ```
 
 ### Core Components
@@ -53,7 +62,8 @@ src/
 
 The server implements a handler-based architecture where each Kafka API has dedicated request/response classes:
 
-- **Request Types**: `KafkaRequest` (base), `FetchRequest`, `ApiVersionRequest`, `DescribeTopicPartitionsRequest`
+- **Request Types**: `KafkaRequest` (base), `FetchRequest`, `ApiVersionRequest`, `DescribeTopicsRequest`
+- **KafkaRequestVariant**: `std::variant<ApiVersionRequest, DescribeTopicsRequest, FetchRequest>`; parser returns variant, handlers use `std::get<>`
 - **Response Types**: `FetchResponse`, `ApiVersionsResponse`, `DescribeTopicsResponse`
 - **Handler Registration**: API handlers are registered by API key in `KafkaServer::registerHandlers()`
 
@@ -71,7 +81,7 @@ The server implements a handler-based architecture where each Kafka API has dedi
 
 ## Project Configuration
 
-- **Language**: C++23 (set in CMakeLists.txt and codecrafters.yml)
+- **Language**: C++23 (set in CMakeLists.txt)
 - **Dependencies**: spdlog (for logging)
 - **Port**: Server runs on port 9092 by default
 - **Build System**: CMake with vcpkg toolchain

@@ -2,15 +2,12 @@
 #include "include/describe_topics_partitions_response.hpp"
 #include "include/fetch_response.hpp"
 
-using DescribeTopicPartitions =
-    DescribeTopicPartitionsResponse::DescribeTopicPartitions;
+using DescribeTopicPartitions = DescribeTopicPartitionsResponse::DescribeTopicPartitions;
 
-ApiVersionResponse &ApiVersionResponse::writeHeader(int32_t correlation_id,
-                                                    int16_t api_version) {
+ApiVersionResponse &ApiVersionResponse::writeHeader(int32_t correlation_id, int16_t api_version) {
   skipBytes(4) // Message size placeholder
       .writeInt32(correlation_id)
-      .writeInt16(api_version >= ApiVersions::MIN_VERSION &&
-                          api_version <= ApiVersions::MAX_VERSION
+      .writeInt16(api_version >= ApiVersions::MIN_VERSION && api_version <= ApiVersions::MAX_VERSION
                       ? 0
                       : ApiVersions::UNSUPPORTED_VERSION)
       .writeUInt8(4); // num_entries

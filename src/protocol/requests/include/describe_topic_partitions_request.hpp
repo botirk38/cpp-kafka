@@ -1,3 +1,6 @@
+#pragma once
+
+#include "api_keys.hpp"
 #include "kafka_request.hpp"
 #include <optional>
 #include <string>
@@ -5,6 +8,7 @@
 
 class DescribeTopicsRequest : public KafkaRequest {
 public:
+  static constexpr int16_t KEY = KafkaProtocol::DESCRIBE_TOPIC_PARTITIONS;
   std::vector<std::string> topic_names;
   int32_t response_partition_limit;
   struct Cursor {
