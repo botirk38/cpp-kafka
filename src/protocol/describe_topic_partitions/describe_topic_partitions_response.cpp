@@ -72,11 +72,11 @@ DescribeTopicPartitionsResponse::writeUnknownTopicError(const std::string &topic
                  ERROR_UNKNOWN_TOPIC_OR_PARTITION) // error code for unknown topic
       .writeInt8(topic_name.length() + 1)          // Compact string length
       .writeCompactString(topic_name)
-      .writeBytes(std::array<uint8_t, 16>{}.data(), 16) // Empty UUID
-      .writeInt8(0)                                     // is_internal
-      .writeInt8(1)                                     // partitions array length (empty array = 1)
-      .writeInt32(0)                                    // topic_authorized_operations
-      .writeInt8(0);                                    // Tag buffer
+      .writeBytes(std::array<uint8_t, 16> {}.data(), 16) // Empty UUID
+      .writeInt8(0)                                      // is_internal
+      .writeInt8(1)  // partitions array length (empty array = 1)
+      .writeInt32(0) // topic_authorized_operations
+      .writeInt8(0); // Tag buffer
 
   return *this;
 }

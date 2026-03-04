@@ -56,7 +56,7 @@ private:
 
     const uint8_t *data;
     size_t length;
-    size_t offset{0};
+    size_t offset {0};
   };
 
   static RequestHeader parseHeader(Buffer &buffer);

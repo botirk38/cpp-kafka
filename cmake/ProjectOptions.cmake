@@ -1,13 +1,8 @@
 # ProjectOptions.cmake - Global project configuration
 include_guard(GLOBAL)
 
-# C++26 when compiler supports it; fallback to C++23 (C++26 not yet in stable compilers)
-option(USE_CPP26 "Use C++26 standard (requires GCC 14+ / Clang 18+)" OFF)
-if(USE_CPP26)
-  set(CMAKE_CXX_STANDARD 26)
-else()
-  set(CMAKE_CXX_STANDARD 23)
-endif()
+# C++26 standard
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

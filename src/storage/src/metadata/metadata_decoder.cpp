@@ -54,7 +54,7 @@ TopicInfo decodeTopicRecord(std::span<const uint8_t> data) {
 
   TopicInfo info;
   info.name = std::move(name);
-  info.topic_id = TopicId{readUint128(data, pos)};
+  info.topic_id = TopicId {readUint128(data, pos)};
   return info;
 }
 
@@ -68,7 +68,7 @@ PartitionInfo decodePartitionRecord(std::span<const uint8_t> data) {
 
   PartitionInfo info;
   info.partition_id = readInt32BE(data, pos);
-  info.topic_id = TopicId{readUint128(data, pos)};
+  info.topic_id = TopicId {readUint128(data, pos)};
 
   checkBounds(data, pos, 1, "replica_count");
   int replica_count = static_cast<int>(data[pos++]) - 1;

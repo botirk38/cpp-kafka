@@ -64,7 +64,7 @@ void KafkaServer::start() {
   server_socket_.listen(5);
 
   while (true) {
-    struct sockaddr_in client_addr{};
+    struct sockaddr_in client_addr {};
     socklen_t client_addr_len = sizeof(client_addr);
 
     SocketFd client = server_socket_.accept(client_addr, client_addr_len);
@@ -164,13 +164,13 @@ void KafkaServer::handleFetch(const FetchRequest &request, char *response, int &
   for (const auto &topic : request.topics) {
     writer.writeTopicHeader(topic.topic_id, static_cast<int64_t>(topic.partitions.size()) + 1);
 
-    auto topic_info = storage_->findTopicById(*snapshot, storage::TopicId{topic.topic_id});
+    auto topic_info = storage_->findTopicById(*snapshot, storage::TopicId {topic.topic_id});
 
     for (const auto &partition : topic.partitions) {
       if (!topic_info) {
         writer.writePartitionData(
             partition.partition, KafkaProtocol::Fetch::ERROR_UNKNOWN_TOPIC_OR_PARTITION, 0, 0, 0,
-            std::vector<FetchResponse::AbortedTransaction>{}, 0, RecordBatches{});
+            std::vector<FetchResponse::AbortedTransaction> {}, 0, RecordBatches {});
         continue;
       }
 
@@ -179,17 +179,17 @@ void KafkaServer::handleFetch(const FetchRequest &request, char *response, int &
           static_cast<size_t>(partition.partition) >= partitions.size()) {
         writer.writePartitionData(
             partition.partition, KafkaProtocol::Fetch::ERROR_UNKNOWN_TOPIC_OR_PARTITION, 0, 0, 0,
-            std::vector<FetchResponse::AbortedTransaction>{}, 0, RecordBatches{});
+            std::vector<FetchResponse::AbortedTransaction> {}, 0, RecordBatches {});
         continue;
       }
 
       const auto &partition_info = partitions[static_cast<size_t>(partition.partition)];
       auto partition_data =
           storage_->readPartitionData(topic_info->name, partition_info.partition_id);
-      RecordBatches batches = partition_data ? std::move(*partition_data) : RecordBatches{};
+      RecordBatches batches = partition_data ? std::move(*partition_data) : RecordBatches {};
 
       writer.writePartitionData(partition.partition, 0, 0, 0, 0,
-                                std::vector<FetchResponse::AbortedTransaction>{}, 0, batches);
+                                std::vector<FetchResponse::AbortedTransaction> {}, 0, batches);
     }
   }
 

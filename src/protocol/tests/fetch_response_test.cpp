@@ -7,8 +7,8 @@ TEST(FetchResponseTest, WritesValidResponse) {
   writer.writeHeader(42)
       .writeResponseData(0, 0, 0, 2) // 1 topic
       .writeTopicHeader(1, 2)        // 1 partition
-      .writePartitionData(0, 0, 0, 0, 0, std::vector<FetchResponse::AbortedTransaction>{}, 0,
-                          RecordBatches{})
+      .writePartitionData(0, 0, 0, 0, 0, std::vector<FetchResponse::AbortedTransaction> {}, 0,
+                          RecordBatches {})
       .complete();
   EXPECT_GT(writer.getOffset(), 0);
 }
@@ -20,7 +20,7 @@ TEST(FetchResponseTest, WritesPartitionWithError) {
       .writeResponseData(0, 0, 0, 2)
       .writeTopicHeader(0, 2)
       .writePartitionData(0, -1, 0, 0, 0, // error_code -1 = UNKNOWN_TOPIC
-                          std::vector<FetchResponse::AbortedTransaction>{}, 0, RecordBatches{})
+                          std::vector<FetchResponse::AbortedTransaction> {}, 0, RecordBatches {})
       .complete();
   EXPECT_GT(writer.getOffset(), 0);
 }

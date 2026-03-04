@@ -5,7 +5,7 @@
 #include <thread>
 
 TEST(ThreadPoolTest, ExecutesTask) {
-  std::atomic<int> counter{0};
+  std::atomic<int> counter {0};
   ThreadPool pool(2);
   pool.enqueue([&counter] { counter = 1; });
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -13,7 +13,7 @@ TEST(ThreadPoolTest, ExecutesTask) {
 }
 
 TEST(ThreadPoolTest, ExecutesMultipleTasks) {
-  std::atomic<int> counter{0};
+  std::atomic<int> counter {0};
   ThreadPool pool(2);
   for (int i = 0; i < 10; i++) {
     pool.enqueue([&counter] { counter++; });
@@ -23,7 +23,7 @@ TEST(ThreadPoolTest, ExecutesMultipleTasks) {
 }
 
 TEST(ThreadPoolTest, DestructorJoinsWorkers) {
-  std::atomic<int> done{0};
+  std::atomic<int> done {0};
   {
     ThreadPool pool(2);
     pool.enqueue([&done] { done++; });

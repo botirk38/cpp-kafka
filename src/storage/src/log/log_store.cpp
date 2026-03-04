@@ -10,7 +10,7 @@ std::expected<PartitionData, StorageError> LogStore::readPartition(const std::st
                                                                    int32_t partition_id) {
   std::ifstream file(resolver_.partitionLogPath(topic_name, partition_id), std::ios::binary);
   if (!file.is_open()) {
-    return PartitionData{};
+    return PartitionData {};
   }
 
   BatchScanner scanner(file);

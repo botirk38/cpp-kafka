@@ -75,7 +75,7 @@ public:
   SocketFd accept(struct sockaddr_in &client_addr, socklen_t &len) {
     int client_fd = ::accept(fd_, reinterpret_cast<struct sockaddr *>(&client_addr), &len);
     if (client_fd < 0) {
-      return SocketFd{};
+      return SocketFd {};
     }
     return SocketFd(client_fd);
   }
@@ -88,5 +88,5 @@ public:
   }
 
 private:
-  int fd_{-1};
+  int fd_ {-1};
 };
