@@ -1,17 +1,15 @@
 #pragma once
+#include "../../base/include/kafka_types.hpp"
 #include "../../base/include/message_writer.hpp"
 #include <cstdint>
 #include <vector>
 
-using uint128_t = __uint128_t;
-
-// Neutral type: raw record batch bytes (no storage dependency)
-using RecordBatches = std::vector<std::vector<uint8_t>>;
+namespace KafkaProtocol::Fetch {
+inline constexpr int16_t ERROR_UNKNOWN_TOPIC_OR_PARTITION = 3;
+}
 
 class FetchResponse : public MessageWriter<FetchResponse> {
 public:
-  enum Fetch { KEY = 1, MAX_VERSION = 16, MIN_VERSION = 0 };
-
   struct AbortedTransaction {
     int64_t producer_id;
     int64_t first_offset;

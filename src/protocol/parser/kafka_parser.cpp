@@ -100,7 +100,7 @@ RequestHeader Parser::parseHeader(Buffer &buffer) {
   return header;
 }
 
-ApiVersionRequest Parser::parseApiVersion(Buffer &buffer, RequestHeader header) {
+ApiVersionRequest Parser::parseApiVersion(Buffer & /*buffer*/, RequestHeader header) {
   ApiVersionRequest request;
   request.header = std::move(header);
   return request;

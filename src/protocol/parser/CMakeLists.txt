@@ -1,0 +1,6 @@
+add_library(kafka_protocol_parser kafka_parser.cpp)
+target_include_directories(kafka_protocol_parser PUBLIC include)
+target_link_libraries(kafka_protocol_parser PUBLIC kafka_protocol_base)
+kafka_enable_warnings(kafka_protocol_parser)
+kafka_enable_sanitizers(kafka_protocol_parser)
+kafka_enable_coverage(kafka_protocol_parser)

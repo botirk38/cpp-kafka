@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../../protocol/base/include/api_keys.hpp"
-#include "../../protocol/base/include/kafka_request.hpp"
-#include "../../protocol/requests/include/api_version_request.hpp"
-#include "../../protocol/requests/include/describe_topic_partitions_request.hpp"
-#include "../../protocol/requests/include/fetch_request.hpp"
-#include "../../protocol/requests/include/kafka_request_variant.hpp"
+#include "../../api_versions/include/api_versions_request.hpp"
+#include "../../base/include/api_keys.hpp"
+#include "../../base/include/kafka_request.hpp"
+#include "../../base/include/kafka_request_variant.hpp"
+#include "../../describe_topic_partitions/include/describe_topic_partitions_request.hpp"
+#include "../../fetch/include/fetch_request.hpp"
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>

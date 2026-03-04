@@ -1,7 +1,7 @@
 #pragma once
 
-#include "api_keys.hpp"
-#include "kafka_request.hpp"
+#include "../../base/include/api_keys.hpp"
+#include "../../base/include/kafka_request.hpp"
 
 class ApiVersionRequest : public KafkaRequest {
 public:

@@ -1,11 +1,9 @@
 #pragma once
+#include "kafka_types.hpp"
 #include <arpa/inet.h>
-#include <cstdint>
 #include <cstring>
 #include <netinet/in.h>
 #include <string>
-
-using uint128_t = __uint128_t;
 
 template <typename Derived> class MessageWriter {
 protected:

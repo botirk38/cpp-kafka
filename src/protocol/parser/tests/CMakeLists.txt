@@ -1,0 +1,6 @@
+add_executable(kafka_parser_tests parser_test.cpp)
+target_link_libraries(kafka_parser_tests PRIVATE GTest::gtest_main kafka_protocol_parser)
+kafka_enable_warnings(kafka_parser_tests)
+kafka_enable_sanitizers(kafka_parser_tests)
+kafka_enable_coverage(kafka_parser_tests)
+gtest_discover_tests(kafka_parser_tests)

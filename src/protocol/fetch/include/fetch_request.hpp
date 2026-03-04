@@ -1,8 +1,8 @@
 #pragma once
 
-#include "api_keys.hpp"
-#include "fetch_response.hpp"
-#include "kafka_request.hpp"
+#include "../../base/include/api_keys.hpp"
+#include "../../base/include/kafka_request.hpp"
+#include "../../base/include/kafka_types.hpp"
 #include <vector>
 
 struct FetchPartition {

@@ -1,11 +1,9 @@
 #include "include/kafka_server.hpp"
-#include "../common/include/kafka_errors.hpp"
-#include "../protocol/base/include/kafka_request.hpp"
-#include "../protocol/responses/include/api_version_response.hpp"
-#include "../protocol/responses/include/describe_topics_partitions_response.hpp"
-#include "../protocol/responses/include/fetch_response.hpp"
-#include "../storage/include/storage_service.hpp"
-#include "include/kafka_parser.hpp"
+#include "../../protocol/api_versions/include/api_versions_response.hpp"
+#include "../../protocol/describe_topic_partitions/include/describe_topic_partitions_response.hpp"
+#include "../../protocol/fetch/include/fetch_response.hpp"
+#include "../../protocol/parser/include/kafka_parser.hpp"
+#include "../../storage/include/storage_service.hpp"
 #include <cstring>
 #include <iostream>
 #include <ostream>
@@ -116,7 +114,7 @@ void KafkaServer::handleClient(int client_fd) {
 void KafkaServer::handleApiVersions(const ApiVersionRequest &request, char *response, int &offset) {
   const auto &header = request.header;
 
-  ApiVersionResponse writer(response);
+  ApiVersionsResponse writer(response);
   writer.writeHeader(header.correlation_id, header.api_version)
       .writeApiVersionSupport()
       .writeDescribeTopicsSupport()
@@ -170,18 +168,18 @@ void KafkaServer::handleFetch(const FetchRequest &request, char *response, int &
 
     for (const auto &partition : topic.partitions) {
       if (!topic_info) {
-        writer.writePartitionData(partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
-                                  std::vector<FetchResponse::AbortedTransaction>{}, 0,
-                                  RecordBatches{});
+        writer.writePartitionData(
+            partition.partition, KafkaProtocol::Fetch::ERROR_UNKNOWN_TOPIC_OR_PARTITION, 0, 0, 0,
+            std::vector<FetchResponse::AbortedTransaction>{}, 0, RecordBatches{});
         continue;
       }
 
       const auto &partitions = topic_info->partitions;
       if (partition.partition < 0 ||
           static_cast<size_t>(partition.partition) >= partitions.size()) {
-        writer.writePartitionData(partition.partition, ERROR_UNKNOWN_TOPIC, 0, 0, 0,
-                                  std::vector<FetchResponse::AbortedTransaction>{}, 0,
-                                  RecordBatches{});
+        writer.writePartitionData(
+            partition.partition, KafkaProtocol::Fetch::ERROR_UNKNOWN_TOPIC_OR_PARTITION, 0, 0, 0,
+            std::vector<FetchResponse::AbortedTransaction>{}, 0, RecordBatches{});
         continue;
       }
 

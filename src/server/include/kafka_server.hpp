@@ -1,7 +1,11 @@
 #pragma once
 
+#include "../../protocol/api_versions/include/api_versions_request.hpp"
 #include "../../protocol/base/include/api_keys.hpp"
-#include "../../protocol/requests/include/kafka_request_variant.hpp"
+#include "../../protocol/base/include/kafka_request_variant.hpp"
+#include "../../protocol/describe_topic_partitions/include/describe_topic_partitions_request.hpp"
+#include "../../protocol/fetch/include/fetch_request.hpp"
+#include "../../protocol/fetch/include/fetch_response.hpp"
 #include "../../storage/include/storage_service.hpp"
 #include "socket_fd.hpp"
 #include "thread_pool.hpp"

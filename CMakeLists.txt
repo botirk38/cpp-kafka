@@ -11,12 +11,11 @@ include(Sanitizers)
 include(Coverage)
 include(Dependencies)
 
-add_subdirectory(src/common)
 add_subdirectory(src/protocol)  # protocol adds storage as subdirectory
-add_subdirectory(src/core)
+add_subdirectory(src/server)
 
 add_executable(kafka src/main.cpp)
-target_link_libraries(kafka PRIVATE kafka_core)
+target_link_libraries(kafka PRIVATE kafka_server)
 kafka_enable_warnings(kafka)
 kafka_enable_sanitizers(kafka)
 kafka_enable_coverage(kafka)
@@ -31,6 +30,6 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/core/tests ${CMAKE_BINARY_DIR}/core-tests)
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/protocol/tests ${CMAKE_BINARY_DIR}/protocol-tests)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/server/tests ${CMAKE_BINARY_DIR}/server-tests)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/protocol/parser/tests ${CMAKE_BINARY_DIR}/parser-tests)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/storage/tests ${CMAKE_BINARY_DIR}/storage-tests)

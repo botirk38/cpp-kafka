@@ -1,5 +1,5 @@
-#include "include/describe_topics_partitions_response.hpp"
-#include "include/fetch_response.hpp"
+#include "include/describe_topic_partitions_response.hpp"
+#include "../../base/include/api_keys.hpp"
 #include <array>
 #include <netinet/in.h>
 #include <optional>
@@ -68,8 +68,9 @@ DescribeTopicPartitionsResponse::writePartitionMetadata(int32_t partition_id) {
 
 DescribeTopicPartitionsResponse &
 DescribeTopicPartitionsResponse::writeUnknownTopicError(const std::string &topic_name) {
-  writeInt16(ERROR_UNKNOWN_TOPIC)         // error code for unknown topic
-      .writeInt8(topic_name.length() + 1) // Compact string length
+  writeInt16(KafkaProtocol::DescribeTopicPartitions::
+                 ERROR_UNKNOWN_TOPIC_OR_PARTITION) // error code for unknown topic
+      .writeInt8(topic_name.length() + 1)          // Compact string length
       .writeCompactString(topic_name)
       .writeBytes(std::array<uint8_t, 16>{}.data(), 16) // Empty UUID
       .writeInt8(0)                                     // is_internal
@@ -82,8 +83,8 @@ DescribeTopicPartitionsResponse::writeUnknownTopicError(const std::string &topic
 
 DescribeTopicPartitionsResponse &DescribeTopicPartitionsResponse::complete() {
 
-  writeInt8(0xff)    // Next cursor (null)
-      .writeInt8(0); // Tag buffer
+  writeInt8(static_cast<int8_t>(0xff)) // Next cursor (null)
+      .writeInt8(0);                   // Tag buffer
 
   updateMessageSize();
   return *this;

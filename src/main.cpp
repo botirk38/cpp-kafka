@@ -1,4 +1,4 @@
-#include "core/include/kafka_server.hpp"
+#include "server/include/kafka_server.hpp"
 #include <iostream>
 
 int main() {

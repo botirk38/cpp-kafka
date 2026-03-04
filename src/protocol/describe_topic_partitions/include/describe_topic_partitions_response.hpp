@@ -5,6 +5,10 @@
 #include <optional>
 #include <string>
 
+namespace KafkaProtocol::DescribeTopicPartitions {
+inline constexpr int16_t ERROR_UNKNOWN_TOPIC_OR_PARTITION = 3;
+}
+
 class DescribeTopicPartitionsResponse : public MessageWriter<DescribeTopicPartitionsResponse> {
 public:
   DescribeTopicPartitionsResponse(char *buf) : MessageWriter(buf) {}
@@ -14,8 +18,6 @@ public:
   DescribeTopicPartitionsResponse &writeTopic(const std::string &topic_name,
                                               const std::optional<storage::TopicInfo> &topic_info);
   DescribeTopicPartitionsResponse &complete();
-
-  enum DescribeTopicPartitions { KEY = 75, ERROR_UNKNOWN_TOPIC = 3, TAG_BUFFER = 0 };
 
 private:
   DescribeTopicPartitionsResponse &

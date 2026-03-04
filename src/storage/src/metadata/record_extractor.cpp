@@ -23,16 +23,6 @@ int32_t readZigZagVarint(std::span<const uint8_t> &data) {
   return (n >> 1) ^ -(n & 1);
 }
 
-void skipRecord(std::span<const uint8_t> &data) {
-  if (data.size() < 1) {
-    return;
-  }
-  int32_t length = readVarint(data);
-  if (length <= 0 || data.size() < static_cast<size_t>(length)) {
-    return;
-  }
-  data = data.subspan(length);
-}
 } // namespace
 
 std::vector<std::vector<uint8_t>> extractRecordValues(std::span<const uint8_t> batch) {
@@ -49,7 +39,6 @@ std::vector<std::vector<uint8_t>> extractRecordValues(std::span<const uint8_t> b
     if (rest.size() < 1) {
       break;
     }
-    auto rec_start = rest;
     int32_t length = readVarint(rest);
     if (length <= 0 || rest.size() < static_cast<size_t>(length)) {
       break;

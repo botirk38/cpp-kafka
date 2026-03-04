@@ -1,7 +1,7 @@
-#include "../../protocol/base/include/api_keys.hpp"
-#include "../../protocol/requests/include/describe_topic_partitions_request.hpp"
-#include "../../protocol/requests/include/fetch_request.hpp"
-#include "../../protocol/requests/include/kafka_request_variant.hpp"
+#include "../../base/include/api_keys.hpp"
+#include "../../base/include/kafka_request_variant.hpp"
+#include "../../describe_topic_partitions/include/describe_topic_partitions_request.hpp"
+#include "../../fetch/include/fetch_request.hpp"
 #include "../include/kafka_parser.hpp"
 #include <arpa/inet.h>
 #include <cstring>

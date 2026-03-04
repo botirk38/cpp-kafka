@@ -1,0 +1,6 @@
+add_library(kafka_protocol_fetch fetch_response.cpp)
+target_include_directories(kafka_protocol_fetch PUBLIC include)
+target_link_libraries(kafka_protocol_fetch PUBLIC kafka_protocol_base)
+kafka_enable_warnings(kafka_protocol_fetch)
+kafka_enable_sanitizers(kafka_protocol_fetch)
+kafka_enable_coverage(kafka_protocol_fetch)
