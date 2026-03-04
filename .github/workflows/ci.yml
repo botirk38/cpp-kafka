@@ -21,19 +21,23 @@ jobs:
       - name: Install deps (Ubuntu)
         if: runner.os == 'Linux'
         run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update
           sudo apt-get install -y g++-15 libspdlog-dev wget
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
           wget -qO- https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz | sudo tar xz -C /usr/local --strip-components=1
+          echo "CMAKE_EXTRA_FLAGS=" >> $GITHUB_ENV
 
       - name: Install deps (macOS)
         if: runner.os == 'macOS'
-        run: brew install cmake spdlog
+        run: |
+          brew install cmake spdlog gcc
+          echo "CMAKE_EXTRA_FLAGS=-DCMAKE_C_COMPILER=gcc-15 -DCMAKE_CXX_COMPILER=g++-15" >> $GITHUB_ENV
 
       - name: Build and test
         run: |
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release $CMAKE_EXTRA_FLAGS
           cmake --build build
           ctest --test-dir build --output-on-failure
 
@@ -52,6 +56,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install deps
         run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update
           sudo apt-get install -y g++-15 libspdlog-dev wget
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
@@ -70,6 +75,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install deps
         run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
           sudo apt-get update
           sudo apt-get install -y g++-15 libspdlog-dev wget lcov
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
