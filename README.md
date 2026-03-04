@@ -1,153 +1,182 @@
-
 # cpp-kafka
 
-[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
-[![CMake](https://img.shields.io/badge/CMake-3.28+-064F8C.svg)](https://cmake.org/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+A lightweight, high-performance Kafka server implementation in modern C++26. This project implements core Kafka protocol operations with an efficient thread-pool architecture and CRTP-based binary protocol serialization.
 
-A lightweight, high-performance Kafka server implementation in modern C++23.
+## Status
 
-## Overview
+| Metric | Value |
+|--------|-------|
+| C++ Standard | C++26 |
+| CMake | 4.2.3+ |
+| License | Apache 2.0 |
 
-cpp-kafka is a Kafka-compatible server that implements core Kafka protocol operations. Built with modern C++ practices, it provides efficient message handling through a thread-pool architecture and CRTP-based binary protocol serialization.
-
-## Features
-
-- ✅ **Kafka Protocol Support**: API Versions, Describe Topic Partitions, and Fetch operations
-- ⚡ **High Performance**: Thread-pool based concurrent client handling
-- 🏗️ **Modern C++**: Leverages C++23 features and CRTP patterns
-- 📦 **Log-Based Storage**: Efficient record batch reading and storage
-- 🔌 **Extensible**: Modular architecture for easy feature additions
+CI Status: Build, Tests, Lint, ASan, and Coverage all pass on Linux (GCC 15) and macOS (GCC 15 via Homebrew).
 
 ## Quick Start
 
 ### Prerequisites
 
-- **C++ Compiler**: GCC 13+ or Clang 15+ (with C++23 support)
-- **CMake**: 3.28+
-- **spdlog**: Optional, for logging support
+- GCC 15 or later (C++26 support required)
+- CMake 4.2.3 or later
+- spdlog (optional, for logging)
 
-### Installation
+### Build and Run
 
 ```bash
-# Clone the repository
 git clone https://github.com/botirk38/cpp-kafka.git
 cd cpp-kafka
 
-# Build the project
 cmake -B build -S .
 cmake --build ./build
 
-# Run the server
+# Run the server (listens on port 9092)
 ./build/kafka
+
+# Run tests
+ctest --test-dir build --output-on-failure
 ```
 
-The server will start listening on port **9092** by default.
-
-### Quick Build Script
+Or use the convenience build script:
 
 ```bash
 ./your_program.sh
 ```
 
+## Features
+
+- Kafka Protocol Support: API Versions, Describe Topic Partitions, Fetch operations
+- High Performance: Thread-pool based concurrent client handling
+- Modern C++: Full C++26 features and CRTP patterns
+- Efficient Storage: Log-based storage with batch reading
+- Clean Architecture: Modular design for easy extension
+
 ## Architecture
 
-The project follows a clean, layered architecture:
+The codebase follows a clean layered architecture with clear separation of concerns.
+
+### Layer Overview
 
 ```
-┌─────────────────────────────────────┐
-│         Core Layer                  │  Server, Parser, ThreadPool
-├─────────────────────────────────────┤
-│       Protocol Layer                │  Requests, Responses, Serialization
-├─────────────────────────────────────┤
-│       Storage Layer                 │  Logs, Metadata, RecordBatches
-├─────────────────────────────────────┤
-│       Common Layer                  │  Utilities, Errors, Metadata Types
-└─────────────────────────────────────┘
+Server Layer
+  - Network I/O, client connection management
+  - KafkaServer, ThreadPool, SocketFD
+
+Protocol Layer
+  - Kafka API implementations (API Versions, Describe Topics, Fetch)
+  - Request parsing and response generation
+  - Binary serialization (MessageWriter, ByteReader)
+
+Storage Layer
+  - Topic metadata, partition info
+  - Log storage and batch reading
+  - IStorageService interface for abstraction
+
+Common
+  - Shared utilities and error types
 ```
 
 ### Directory Structure
 
 ```
 src/
-├── core/                    # Server and connection handling
-│   ├── include/             # Public headers
-│   ├── tests/               # Core module tests
-│   └── *.cpp                # Implementation
-├── protocol/                # Kafka protocol implementation
-│   ├── base/include/        # Base classes (MessageWriter, ByteReader)
-│   ├── requests/include/    # Request types
-│   ├── responses/           # Response types and implementations
-│   └── tests/               # Protocol module tests
-├── storage/                 # Data persistence (layered)
-│   ├── include/             # Public API (IStorageService, storage types)
-│   ├── io/, metadata/, log/ # Path resolver, metadata store, batch scanner, log store
-│   ├── internal/            # StorageService implementation
-│   └── tests/               # Storage module tests
-└── common/include/          # Shared utilities
+├── server/              Server and networking
+│   ├── include/        Public headers
+│   ├── tests/          Unit tests
+│   └── *.cpp           Implementation
+├── protocol/           Kafka protocol layer
+│   ├── base/           Common protocol types and serialization
+│   ├── parser/         Request parsing
+│   ├── api_versions/   API Versions implementation
+│   ├── describe_topic_partitions/  Describe Topics implementation
+│   ├── fetch/          Fetch implementation
+│   └── tests/          Protocol tests
+├── storage/            Data persistence
+│   ├── include/        Public API
+│   ├── io/            Binary I/O operations
+│   ├── metadata/       Metadata management
+│   ├── log/            Log storage
+│   ├── internal/       Implementation details
+│   └── tests/          Storage tests
 ```
 
-### Key Components
+## Supported Kafka APIs
 
-| Component | Description |
-|-----------|-------------|
-| **KafkaServer** | TCP server managing client connections on port 9092 |
-| **KafkaParser** | Binary protocol parser for Kafka messages |
-| **ThreadPool** | Concurrent request handler |
-| **MessageWriter/ByteReader** | CRTP-based binary serialization |
-| **IStorageService** | Storage API; cluster snapshot, topic lookup, partition data |
+| Operation | API Key | Description |
+|-----------|---------|-------------|
+| API Versions | 18 | Query supported protocol versions |
+| Describe Topic Partitions | 75 | Get topic and partition metadata |
+| Fetch | 1 | Retrieve messages from partitions |
 
-## Supported Operations
+## Key Components
 
-| API | Key | Description |
-|-----|-----|-------------|
-| **ApiVersions** | 18 | Negotiate protocol versions |
-| **DescribeTopicPartitions** | 75 | Retrieve topic metadata |
-| **Fetch** | 1 | Fetch messages from topics |
+- **KafkaServer**: TCP listener on port 9092, manages client lifecycle
+- **KafkaParser**: Binary protocol message parser
+- **ThreadPool**: Concurrent request handling with worker threads
+- **MessageWriter / ByteReader**: CRTP-based binary serialization with network byte order conversion
+- **IStorageService**: Abstract storage interface for topics, partitions, and messages
+
+## Build Options
+
+```bash
+cmake -B build -S . \
+  -DENABLE_COVERAGE=ON    # Code coverage instrumentation
+  -DENABLE_ASAN=ON        # AddressSanitizer (memory safety)
+  -DENABLE_UBSAN=ON       # UndefinedBehaviorSanitizer
+  -DCMAKE_BUILD_TYPE=Release
+```
 
 ## Development
 
-### Building from Source
+### Running Tests
 
 ```bash
-# Clean build
-rm -rf build
 cmake -B build -S .
 cmake --build ./build
-
-# Run tests
 ctest --test-dir build --output-on-failure
-
-# Run server
-./build/kafka
 ```
 
-### Build Options
+### Code Standards
 
-- `-DENABLE_COVERAGE=ON` - Enable coverage instrumentation
-- `-DENABLE_ASAN=ON` - Enable AddressSanitizer
-- `-DENABLE_UBSAN=ON` - Enable UndefinedBehaviorSanitizer
-- `-DUSE_CPP26=ON` - Use C++26 (requires GCC 14+ / Clang 18+)
-
-### Project Guidelines
-
-- Each module has its own `include/` directory
-- Use relative paths for cross-module includes
-- Follow C++23 standards and best practices
+- C++26 is required throughout the project
 - All binary protocol data uses network byte order (big-endian)
+- Each module has its own `include/` directory for public headers
+- Use relative paths for cross-module includes
+- Proper error handling with exceptions
+- All code must pass:
+  - clang-format-18 style checks
+  - AddressSanitizer checks
+  - Code coverage instrumentation
 
-### Adding New Features
+### Adding Features
 
-1. Place headers in `<module>/include/`
-2. Place implementations in `<module>/`
-3. Update CMake if adding new directories
-4. Ensure proper error handling with exceptions
+1. Create headers in `<module>/include/`
+2. Implement in `<module>/` directory
+3. Update CMakeLists.txt if adding new files
+4. Add comprehensive tests
+5. Ensure no compiler warnings
+6. Run full CI locally before pushing
+
+## CI/CD
+
+All commits trigger GitHub Actions CI:
+
+- Build and test on Ubuntu 22.04 (GCC 15) and macOS (GCC 15 via Homebrew)
+- Code formatting check with clang-format-18
+- AddressSanitizer to catch memory errors
+- Code coverage tracking with lcov
+
+See [.github/workflows/ci.yml](.github/workflows/ci.yml) for details.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code standards, and PR guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and how to contribute.
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under Apache License 2.0. See [LICENSE](LICENSE) for details.
 
+## Resources
+
+- [Kafka Protocol Documentation](https://kafka.apache.org/protocol.html)
+- [C++26 Reference](https://en.cppreference.com/w/cpp)
+- [CLAUDE.md](CLAUDE.md) - Developer notes and architecture details
